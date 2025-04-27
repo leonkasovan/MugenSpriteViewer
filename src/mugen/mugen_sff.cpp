@@ -2,66 +2,66 @@
 
 // Palette Texture as GL_UNSIGNED_BYTE
 GLuint generateTextureFromPaletteRGBA(uint32_t pal_rgba[256]) {
-    GLuint tex;
-    uint8_t pal_byte[256 * 4];
+	GLuint tex;
+	uint8_t pal_byte[256 * 4];
 
-    // Convert the RGBA values into bytes (0-255 range for each channel)
-    for (int i = 0; i < 256; i++) {
-        pal_byte[i * 4 + 0] = (pal_rgba[i] >> 0) & 0xFF;
-        pal_byte[i * 4 + 1] = (pal_rgba[i] >> 8) & 0xFF;
-        pal_byte[i * 4 + 2] = (pal_rgba[i] >> 16) & 0xFF;
-        pal_byte[i * 4 + 3] = (pal_rgba[i] >> 24) & 0xFF;  // Alpha
-    }
+	// Convert the RGBA values into bytes (0-255 range for each channel)
+	for (int i = 0; i < 256; i++) {
+		pal_byte[i * 4 + 0] = (pal_rgba[i] >> 0) & 0xFF;
+		pal_byte[i * 4 + 1] = (pal_rgba[i] >> 8) & 0xFF;
+		pal_byte[i * 4 + 2] = (pal_rgba[i] >> 16) & 0xFF;
+		pal_byte[i * 4 + 3] = (pal_rgba[i] >> 24) & 0xFF;  // Alpha
+	}
 
-    glGenTextures(1, &tex);
-    glBindTexture(GL_TEXTURE_2D, tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pal_byte);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pal_byte);
 
-    return tex;
+	return tex;
 }
 
 GLuint generateTextureFromPaletteRGB(rgb_t pal_rgb[256]) {
-    GLuint tex;
-    uint8_t pal_byte[256 * 4];
+	GLuint tex;
+	uint8_t pal_byte[256 * 4];
 
-    // Convert the RGB values into bytes (0-255 range for each channel)
-    for (int i = 0; i < 256; i++) {
-        pal_byte[i * 4 + 0] = pal_rgb[i].r;
-        pal_byte[i * 4 + 1] = pal_rgb[i].g;
-        pal_byte[i * 4 + 2] = pal_rgb[i].b;
-        pal_byte[i * 4 + 3] = i ? 0xFF : 0x00;  // Set alpha to 0 for the first color (or 1.0 if required)
-    }
+	// Convert the RGB values into bytes (0-255 range for each channel)
+	for (int i = 0; i < 256; i++) {
+		pal_byte[i * 4 + 0] = pal_rgb[i].r;
+		pal_byte[i * 4 + 1] = pal_rgb[i].g;
+		pal_byte[i * 4 + 2] = pal_rgb[i].b;
+		pal_byte[i * 4 + 3] = i ? 0xFF : 0x00;  // Set alpha to 0 for the first color (or 1.0 if required)
+	}
 
-    glGenTextures(1, &tex);
-    glBindTexture(GL_TEXTURE_2D, tex);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pal_byte);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pal_byte);
 
-    return tex;
+	return tex;
 }
 
 GLuint generateTextureFromSprite(GLuint spr_w, GLuint spr_h, uint8_t* spr_px) {
-	uint tex;
+	unsigned int tex;
 
-    glGenTextures(1, &tex);
-    glBindTexture(GL_TEXTURE_2D, tex);
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, spr_w, spr_h, 0, GL_RED, GL_UNSIGNED_BYTE, spr_px);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, spr_w, spr_h, 0, GL_RED, GL_UNSIGNED_BYTE, spr_px);
 	// printf("generateTextureFromSprite: spr_w=%u spr_h=%u\n", spr_w, spr_h);
-    return tex;
+	return tex;
 }
 
 void printSprite(Sprite* sprite) {
@@ -72,7 +72,7 @@ void printSprite(Sprite* sprite) {
 		sprite->palidx, -sprite->rle, sprite->coldepth);
 }
 
-int readSffHeader(Sff *sff, FILE* file, uint32_t* lofs, uint32_t* tofs) {
+int readSffHeader(Sff* sff, FILE* file, uint32_t* lofs, uint32_t* tofs) {
 	// Validate header by comparing 12 first bytes with "ElecbyteSpr\x0"
 	char headerCheck[12];
 	fread(headerCheck, 12, 1, file);
@@ -168,7 +168,7 @@ int readSffHeader(Sff *sff, FILE* file, uint32_t* lofs, uint32_t* tofs) {
 	return 0;
 }
 
-int readSpriteHeaderV1(Sprite &sprite, FILE* file, uint32_t* ofs, uint32_t* size, uint16_t* link) {
+int readSpriteHeaderV1(Sprite& sprite, FILE* file, uint32_t* ofs, uint32_t* size, uint16_t* link) {
 	// Read ofs
 	if (fread(ofs, sizeof(uint32_t), 1, file) != 1) {
 		fprintf(stderr, "Error reading ofs\n");
@@ -206,7 +206,7 @@ int readSpriteHeaderV1(Sprite &sprite, FILE* file, uint32_t* ofs, uint32_t* size
 	return 0;
 }
 
-int readSpriteHeaderV2(Sprite &sprite, FILE* file, uint32_t* ofs, uint32_t* size, uint32_t lofs, uint32_t tofs, uint16_t* link) {
+int readSpriteHeaderV2(Sprite& sprite, FILE* file, uint32_t* ofs, uint32_t* size, uint32_t lofs, uint32_t tofs, uint16_t* link) {
 	// Read sprite header
 	if (fread(&sprite.Group, sizeof(int16_t), 1, file) != 1) {
 		fprintf(stderr, "Error reading sprite group\n");
@@ -354,7 +354,7 @@ uint32_t readSffHeader(Sff* sff, uint8_t* data, uint32_t* lofs, uint32_t* tofs) 
 	return offset;
 }
 
-void spriteCopy(Sprite &dst, const Sprite &src) {
+void spriteCopy(Sprite& dst, const Sprite& src) {
 	dst.Group = src.Group;
 	dst.Number = src.Number;
 	dst.Size[0] = src.Size[0];
@@ -367,53 +367,53 @@ void spriteCopy(Sprite &dst, const Sprite &src) {
 	dst.texture_id = src.texture_id;
 }
 
-uint8_t* RlePcxDecode(Sprite &s, uint8_t* srcPx, size_t srcLen) {
-    if (srcLen == 0) {
-        fprintf(stderr, "Warning: PCX data length is zero\n");
-        return NULL;
-    }
+uint8_t* RlePcxDecode(Sprite& s, uint8_t* srcPx, size_t srcLen) {
+	if (srcLen == 0) {
+		fprintf(stderr, "Warning: PCX data length is zero\n");
+		return NULL;
+	}
 
-    size_t dstLen = s.Size[0] * s.Size[1];
-    // printf("\nAllocating memory for PCX decoded data dstLen=%zu (%dx%d)\n", dstLen, s.Size[0], s.Size[1]);
-    uint8_t* dstPx = (uint8_t*)malloc(dstLen);
-    if (!dstPx) {
-        fprintf(stderr, "Error allocating memory for PCX decoded data dstLen=%zu srcLen=%zu (%dx%d)\n", dstLen, srcLen, s.Size[0], s.Size[1]);
-        return NULL;
-    }
+	size_t dstLen = s.Size[0] * s.Size[1];
+	// printf("\nAllocating memory for PCX decoded data dstLen=%zu (%dx%d)\n", dstLen, s.Size[0], s.Size[1]);
+	uint8_t* dstPx = (uint8_t*) malloc(dstLen);
+	if (!dstPx) {
+		fprintf(stderr, "Error allocating memory for PCX decoded data dstLen=%zu srcLen=%zu (%dx%d)\n", dstLen, srcLen, s.Size[0], s.Size[1]);
+		return NULL;
+	}
 
-    size_t i = 0; // input pointer
-    size_t j = 0; // output pointer
+	size_t i = 0; // input pointer
+	size_t j = 0; // output pointer
 
-    while (i < srcLen && j < dstLen) {
-        uint8_t byte = srcPx[i++];
-        int count = 1;
+	while (i < srcLen && j < dstLen) {
+		uint8_t byte = srcPx[i++];
+		int count = 1;
 
-        if ((byte & 0xC0) == 0xC0) { // RLE marker
-            count = byte & 0x3F;
-            if (i < srcLen) {
-                byte = srcPx[i++];
-            } else {
-                fprintf(stderr, "Warning: RLE marker at end of data\n");
-                break;
-            }
-        }
+		if ((byte & 0xC0) == 0xC0) { // RLE marker
+			count = byte & 0x3F;
+			if (i < srcLen) {
+				byte = srcPx[i++];
+			} else {
+				fprintf(stderr, "Warning: RLE marker at end of data\n");
+				break;
+			}
+		}
 
-        while (count-- > 0 && j < dstLen) {
-            dstPx[j++] = byte;
-        }
-    }
+		while (count-- > 0 && j < dstLen) {
+			dstPx[j++] = byte;
+		}
+	}
 
-    if (j < dstLen) {
-        fprintf(stderr, "Warning: decoded PCX data shorter than expected (%zu vs %zu)\n", j, dstLen);
-        // Fill the remaining bytes with 0 (or a background color)
-        memset(dstPx + j, 0, dstLen - j);
-    }
+	if (j < dstLen) {
+		fprintf(stderr, "Warning: decoded PCX data shorter than expected (%zu vs %zu)\n", j, dstLen);
+		// Fill the remaining bytes with 0 (or a background color)
+		memset(dstPx + j, 0, dstLen - j);
+	}
 
-    return dstPx;
+	return dstPx;
 }
 
 
-uint8_t* Rle8Decode(Sprite &s, uint8_t* srcPx, size_t srcLen) {
+uint8_t* Rle8Decode(Sprite& s, uint8_t* srcPx, size_t srcLen) {
 	if (srcLen == 0) {
 		fprintf(stderr, "Warning RLE8 data length is zero\n");
 		return NULL;
@@ -450,7 +450,7 @@ uint8_t* Rle8Decode(Sprite &s, uint8_t* srcPx, size_t srcLen) {
 	return dstPx;
 }
 
-uint8_t* Rle5Decode(Sprite &s, uint8_t* srcPx, size_t srcLen) {
+uint8_t* Rle5Decode(Sprite& s, uint8_t* srcPx, size_t srcLen) {
 	if (srcLen == 0) {
 		fprintf(stderr, "Warning RLE5 data length is zero\n");
 		return NULL;
@@ -503,7 +503,7 @@ uint8_t* Rle5Decode(Sprite &s, uint8_t* srcPx, size_t srcLen) {
 	return dstPx;
 }
 
-uint8_t* Lz5Decode(Sprite &s, uint8_t* srcPx, size_t srcLen) {
+uint8_t* Lz5Decode(Sprite& s, uint8_t* srcPx, size_t srcLen) {
 	if (srcLen == 0) {
 		fprintf(stderr, "Warning LZ5 data length is zero\n");
 		return NULL;
@@ -592,7 +592,7 @@ uint8_t* Lz5Decode(Sprite &s, uint8_t* srcPx, size_t srcLen) {
 	return dstPx;
 }
 
-uint8_t* PngDecode(Sprite &s, uint8_t* data, uint32_t datasize) {
+uint8_t* PngDecode(Sprite& s, uint8_t* data, uint32_t datasize) {
 	lodepng::State state;
 	unsigned int width = 0, height = 0;
 
@@ -609,7 +609,7 @@ uint8_t* PngDecode(Sprite &s, uint8_t* data, uint32_t datasize) {
 	else
 		state.info_raw.bitdepth = 8;
 
-	u_int8_t* dstPx;
+	uint8_t* dstPx;
 	status = lodepng_decode(&dstPx, &width, &height, &state, data, datasize);
 
 	if (status != 0) {
@@ -621,7 +621,7 @@ uint8_t* PngDecode(Sprite &s, uint8_t* data, uint32_t datasize) {
 	return dstPx;
 }
 
-int readPcxHeader(Sprite &s, FILE* file, uint64_t offset) {
+int readPcxHeader(Sprite& s, FILE* file, uint64_t offset) {
 	fseek(file, offset, SEEK_SET);
 	uint16_t dummy;
 	if (fread(&dummy, sizeof(uint16_t), 1, file) != 1) {
@@ -687,7 +687,7 @@ void get_basename_no_ext(const char* path, char* out, size_t out_size) {
 	out[len] = '\0';
 }
 
-uint8_t* readSpriteDataV1(Sprite &s, FILE* file, Sff* sff, uint64_t offset, uint32_t datasize, uint32_t nextSubheader, Sprite* prev, bool c00) {
+uint8_t* readSpriteDataV1(Sprite& s, FILE* file, Sff* sff, uint64_t offset, uint32_t datasize, uint32_t nextSubheader, Sprite* prev, bool c00) {
 	if (nextSubheader > offset) {
 		// Ignore datasize except last
 		datasize = nextSubheader - offset;
@@ -725,7 +725,7 @@ uint8_t* readSpriteDataV1(Sprite &s, FILE* file, Sff* sff, uint64_t offset, uint
 		return NULL;
 	}
 	if (fread(srcPx, srcLen, 1, file) != 1) {
-		fprintf(stderr, "Error reading sprite PCX data pixel. srcLen=%ld datasize=%d palSize=%d\n", srcLen, datasize, palSize);
+		fprintf(stderr, "Error reading sprite PCX data pixel. srcLen=%lld datasize=%d palSize=%d\n", srcLen, datasize, palSize);
 		return NULL;
 	}
 
@@ -757,7 +757,7 @@ uint8_t* readSpriteDataV1(Sprite &s, FILE* file, Sff* sff, uint64_t offset, uint
 	return px;
 }
 
-uint8_t* readSpriteDataV2(Sprite &s, FILE* file, uint64_t offset, uint32_t datasize, Sff* sff) {
+uint8_t* readSpriteDataV2(Sprite& s, FILE* file, uint64_t offset, uint32_t datasize, Sff* sff) {
 	uint8_t* px = NULL;
 	if (s.rle > 0) return NULL;
 
@@ -794,7 +794,7 @@ uint8_t* readSpriteDataV2(Sprite &s, FILE* file, uint64_t offset, uint32_t datas
 			// printf("srcPx=%p srcLen=%ld\n", srcPx, srcLen);
 			rc = fread(srcPx, srcLen, 1, file);
 			if (rc != 1) {
-				fprintf(stderr, "Error reading V2 RLE sprite data (len=%ld). RC=%d.\n", srcLen, rc);
+				fprintf(stderr, "Error reading V2 RLE sprite data (len=%lld). RC=%d.\n", srcLen, rc);
 				free(srcPx);
 				return NULL;
 			}
@@ -832,70 +832,70 @@ uint8_t* readSpriteDataV2(Sprite &s, FILE* file, uint64_t offset, uint32_t datas
 	return px;
 }
 
-int loadMugenSprite(const char *filename, Sff *sff) {
-    FILE *file;
-    file = fopen(filename, "r");
-    if (!file) {
-        printf("Error: can not open file %s\n", filename);
-        return -1;
-    }
-    strncpy(sff->filename, filename, 255);
+int loadMugenSprite(const char* filename, Sff* sff) {
+	FILE* file;
+	file = fopen(filename, "rb");
+	if (!file) {
+		printf("Error: can not open file %s\n", filename);
+		return -1;
+	}
+	strncpy(sff->filename, filename, 255);
 
-    uint32_t lofs, tofs;
-    if (readSffHeader(sff, file, &lofs, &tofs) != 0) {
-        printf("Error: reading header %s\n", filename);
-        return -1;
-    }
+	uint32_t lofs, tofs;
+	if (readSffHeader(sff, file, &lofs, &tofs) != 0) {
+		printf("Error: reading header %s\n", filename);
+		return -1;
+	}
 
-    // Print version
-    if (sff->header.Ver0 != 1) {
-        std::map<std::array<int, 2>, int> uniquePals;
-        sff->palettes.clear();
-        sff->palettes.reserve(sff->header.NumberOfPalettes);
-        for (uint32_t i = 0; i < sff->header.NumberOfPalettes; i++) {
-            fseek(file, sff->header.FirstPaletteHeaderOffset + i * 16, SEEK_SET);
-            int16_t gn[3];
-            if (fread(gn, sizeof(uint16_t), 3, file) != 3) {
-                printf("Failed to read palette group: %s", filename);
-                return -1;
-            }
-            // printf("Palette %d: Group %d, Number %d, ColNumber %d\n", i, gn[0], gn[1], gn[2]);
+	// Print version
+	if (sff->header.Ver0 != 1) {
+		std::map<std::array<int, 2>, int> uniquePals;
+		sff->palettes.clear();
+		sff->palettes.reserve(sff->header.NumberOfPalettes);
+		for (uint32_t i = 0; i < sff->header.NumberOfPalettes; i++) {
+			fseek(file, sff->header.FirstPaletteHeaderOffset + i * 16, SEEK_SET);
+			int16_t gn[3];
+			if (fread(gn, sizeof(uint16_t), 3, file) != 3) {
+				printf("Failed to read palette group: %s", filename);
+				return -1;
+			}
+			// printf("Palette %d: Group %d, Number %d, ColNumber %d\n", i, gn[0], gn[1], gn[2]);
 
-            uint16_t link;
-            if (fread(&link, sizeof(uint16_t), 1, file) != 1) {
-                printf("Failed to read palette link: %s", filename);
-                return -1;
-            }
-            // printf("Palette link: %d\n", link);
+			uint16_t link;
+			if (fread(&link, sizeof(uint16_t), 1, file) != 1) {
+				printf("Failed to read palette link: %s", filename);
+				return -1;
+			}
+			// printf("Palette link: %d\n", link);
 
-            uint32_t ofs, siz;
-            if (fread(&ofs, sizeof(uint32_t), 1, file) != 1) {
-                printf("Failed to read palette offset: %s", filename);
-                return -1;
-            }
-            if (fread(&siz, sizeof(uint32_t), 1, file) != 1) {
-                printf("Failed to read palette size: %s", filename);
-                return -1;
-            }
+			uint32_t ofs, siz;
+			if (fread(&ofs, sizeof(uint32_t), 1, file) != 1) {
+				printf("Failed to read palette offset: %s", filename);
+				return -1;
+			}
+			if (fread(&siz, sizeof(uint32_t), 1, file) != 1) {
+				printf("Failed to read palette size: %s", filename);
+				return -1;
+			}
 
-            // Check if the palette is unique
-            std::array<int, 2> key = { gn[0], gn[1] };
-            if (uniquePals.find(key) == uniquePals.end()) {
-                fseek(file, lofs + ofs, SEEK_SET);
-                uint32_t rgba[256];
-                if (fread(rgba, sizeof(uint32_t), 256, file) != 256) {
-                    printf("Failed to read palette data: %s", filename);
-                    return -1;
-                }
-                sff->palettes[i].texture_id = generateTextureFromPaletteRGBA(rgba);
-                uniquePals[key] = i;
-            } else {
-                // If the palette is not unique, use the existing one
-                printf("Palette %d(%d,%d) is not unique, using palette %d\nUntested code\n", i, gn[0], gn[1], uniquePals[key]);
-                sff->palettes[i].texture_id = sff->palettes[uniquePals[key]].texture_id;
-            }
-        }
-    }
+			// Check if the palette is unique
+			std::array<int, 2> key = { gn[0], gn[1] };
+			if (uniquePals.find(key) == uniquePals.end()) {
+				fseek(file, lofs + ofs, SEEK_SET);
+				uint32_t rgba[256];
+				if (fread(rgba, sizeof(uint32_t), 256, file) != 256) {
+					printf("Failed to read palette data: %s", filename);
+					return -1;
+				}
+				sff->palettes[i].texture_id = generateTextureFromPaletteRGBA(rgba);
+				uniquePals[key] = i;
+			} else {
+				// If the palette is not unique, use the existing one
+				printf("Palette %d(%d,%d) is not unique, using palette %d\nUntested code\n", i, gn[0], gn[1], uniquePals[key]);
+				sff->palettes[i].texture_id = sff->palettes[uniquePals[key]].texture_id;
+			}
+		}
+	}
 
 	sff->sprites.clear();
 	sff->sprites.reserve(sff->header.NumberOfSprites);
@@ -927,18 +927,20 @@ int loadMugenSprite(const char *filename, Sff *sff) {
 				sff->sprites[i].palidx = 0;
 			}
 		} else {
-			uint8_t *data = NULL;
+			uint8_t* data = NULL;
 			bool character = true;
 			switch (sff->header.Ver0) {
 			case 1:
 				data = readSpriteDataV1(sff->sprites[i], file, sff, shofs + 32, size, xofs, prev, character);
 				if (!data) {
+					fprintf(stderr, "Error reading sprite v1 data\n");
 					return -1;
 				}
 				break;
 			case 2:
 				data = readSpriteDataV2(sff->sprites[i], file, xofs, size, sff);
 				if (!data) {
+					fprintf(stderr, "Error reading sprite v2 data\n");
 					return -1;
 				}
 				break;
@@ -979,15 +981,15 @@ int loadMugenSprite(const char *filename, Sff *sff) {
 		sff->header.NumberOfPalettes = sff->palettes.size();
 	}
 
-    return 0;
+	return 0;
 }
 
-void deleteMugenSprite(Sff &sff) {
-    uint32_t i;
-    for (i = 0; i < sff.header.NumberOfPalettes; i++) {
-        glDeleteTextures(1, &sff.palettes[i].texture_id);
-    }
-    for (i = 0; i < sff.header.NumberOfSprites; i++) {
-        glDeleteTextures(1, &sff.sprites[i].texture_id);
-    }
+void deleteMugenSprite(Sff& sff) {
+	uint32_t i;
+	for (i = 0; i < sff.header.NumberOfPalettes; i++) {
+		glDeleteTextures(1, &sff.palettes[i].texture_id);
+	}
+	for (i = 0; i < sff.header.NumberOfSprites; i++) {
+		glDeleteTextures(1, &sff.sprites[i].texture_id);
+	}
 }

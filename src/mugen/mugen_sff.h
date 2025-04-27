@@ -19,9 +19,9 @@
 #define MAX_PALETTES 64
 
 typedef struct __attribute__((packed)) {
-    uint8_t r;
-    uint8_t g;
-    uint8_t b;
+	uint8_t r;
+	uint8_t g;
+	uint8_t b;
 } rgb_t;
 
 // SFF
@@ -34,7 +34,7 @@ typedef struct {
 } SffHeader;
 
 class Sprite {
-	public:
+public:
 	uint16_t Group;
 	uint16_t Number;
 	uint16_t Size[2];
@@ -42,30 +42,29 @@ class Sprite {
 	int palidx;
 	int rle;
 	uint8_t coldepth;
-	uint texture_id;
+	unsigned int texture_id;
 	size_t atlas_x, atlas_y;
 
 	// Constructor!
-    Sprite(uint16_t group, uint16_t number,
+	Sprite(uint16_t group, uint16_t number,
 		uint16_t width, uint16_t height,
 		int16_t offset_x, int16_t offset_y,
 		int pal, int rle_type, uint8_t depth,
-		uint tex_id, size_t ax, size_t ay)
-	 : Group(group), Number(number), palidx(pal), rle(rle_type),
-	   coldepth(depth), texture_id(tex_id), atlas_x(ax), atlas_y(ay)
- {
-	 Size[0] = width;
-	 Size[1] = height;
-	 Offset[0] = offset_x;
-	 Offset[1] = offset_y;
- }
+		unsigned int tex_id, size_t ax, size_t ay)
+		: Group(group), Number(number), palidx(pal), rle(rle_type),
+		coldepth(depth), texture_id(tex_id), atlas_x(ax), atlas_y(ay) {
+		Size[0] = width;
+		Size[1] = height;
+		Offset[0] = offset_x;
+		Offset[1] = offset_y;
+	}
 };
 
 class Palette {
-	public:
-	uint texture_id;
+public:
+	unsigned int texture_id;
 
-	Palette(uint id) : texture_id(id){}
+	Palette(unsigned int id) : texture_id(id) {}
 };
 
 typedef struct {
@@ -91,5 +90,5 @@ uint8_t* readSpriteDataV2(Sprite* sprite, FILE* file, uint64_t offset, uint32_t 
 
 void spriteCopy(Sprite* dst, const Sprite* src);
 void printSprite(Sprite* sprite);
-int loadMugenSprite(const char *filename, Sff *sff);
-void deleteMugenSprite(Sff &sff);
+int loadMugenSprite(const char* filename, Sff* sff);
+void deleteMugenSprite(Sff& sff);
