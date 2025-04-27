@@ -1,52 +1,5 @@
 #include "mugen_sff.h"
 
-// Palette Texture as Float
-// GLuint generateTextureFromPaletteRGBA(uint32_t pal_rgba[256]) {
-//     GLuint tex;
-//     float pal_float[256 * 4];
-
-//     for (int i = 0; i < 256; i++) {
-//         pal_float[i * 4 + 0] = ((pal_rgba[i] >> 0) & 0xFF) / 255.0f;
-//         pal_float[i * 4 + 1] = ((pal_rgba[i] >> 8) & 0xFF) / 255.0f;
-//         pal_float[i * 4 + 2] = ((pal_rgba[i] >> 16) & 0xFF) / 255.0f;
-//         pal_float[i * 4 + 3] = ((pal_rgba[i] >> 24) & 0xFF) / 255.0f;
-//     }
-
-//     glGenTextures(1, &tex);
-//     glBindTexture(GL_TEXTURE_2D, tex);
-//     glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-//     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 256, 1, 0, GL_RGBA, GL_FLOAT, pal_float);
-
-//     return tex;
-// }
-
-// GLuint generateTextureFromPaletteRGB(rgb_t pal_rgb[256]){
-//     GLuint tex;
-//     float pal_float[256 * 4];
-
-//     for (int i = 0; i < 256; i++) {
-//         pal_float[i * 4 + 0] = pal_rgb[i].r / 255.0f;
-//         pal_float[i * 4 + 1] = pal_rgb[i].g / 255.0f;
-//         pal_float[i * 4 + 2] = pal_rgb[i].b / 255.0f;
-//         pal_float[i * 4 + 3] = i ? 1.0f : 0.0f; // TO BE CHECKED
-//     }
-
-//     glGenTextures(1, &tex);
-//     glBindTexture(GL_TEXTURE_2D, tex);
-// 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-// 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-//     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, 256, 1, 0, GL_RGBA, GL_FLOAT, pal_float);
-
-//     return tex;
-// }
-
 // Palette Texture as GL_UNSIGNED_BYTE
 GLuint generateTextureFromPaletteRGBA(uint32_t pal_rgba[256]) {
     GLuint tex;
@@ -322,13 +275,6 @@ int readSpriteHeaderV2(Sprite &sprite, FILE* file, uint32_t* ofs, uint32_t* size
 	} else {
 		*ofs += tofs;
 	}
-
-	// Print sprite header information
-	// printf("Sprite v2 (%d,%d) ofs=%d size=%d\n", sprite->Group, sprite->Number, *ofs, *size);
-	// printf("Sprite Size: %d x %d\n", sprite->Size[0], sprite->Size[1]);
-	// printf("Sprite Offset: %d x %d\n", sprite->Offset[0], sprite->Offset[1]);
-	// printf("Sprite Link: %d\n", *link);
-	// printf("Sprite Format: %d\n", format);
 
 	return 0;
 }
@@ -967,11 +913,8 @@ int loadMugenSprite(const char *filename, Sff *sff) {
 			break;
 		case 2:
 			if (readSpriteHeaderV2(sff->sprites[i], file, &xofs, &size, lofs, tofs, &indexOfPrevious) != 0) {
-				// printf("readSpriteHeaderV2(%d: %d,%d) palidx=%d size=%d indexOfPrevious=%d last_offset=%u\n", i, sff->sprites[i]->Group, sff->sprites[i]->Number, sff->sprites[i]->palidx, size, indexOfPrevious, last_offset);
 				return -1;
 			}
-			// printf("readSpriteHeaderV2(%d: %d,%d) xofs=%d size=%d lofs=%d tofs=%d indexOfPrevious=%d\n", i, sff->sprites[i]->Group, sff->sprites[i]->Number, xofs, size, lofs, tofs, indexOfPrevious);
-			// printf("readSpriteHeaderV2(%d: %d,%d) palidx=%d size=%d indexOfPrevious=%d\n", i, sff->sprites[i]->Group, sff->sprites[i]->Number, sff->sprites[i]->palidx, size, indexOfPrevious);
 			break;
 		}
 
@@ -988,15 +931,10 @@ int loadMugenSprite(const char *filename, Sff *sff) {
 			bool character = true;
 			switch (sff->header.Ver0) {
 			case 1:
-				// if (sff->sprites[i]->Group == 0 && sff->sprites[i]->Number == 0) {
-				// 	character = false;
-				// }
-				// printf("Sprite[%d] (%d,%d) ", i, sff->sprites[i]->Group, sff->sprites[i]->Number);
 				data = readSpriteDataV1(sff->sprites[i], file, sff, shofs + 32, size, xofs, prev, character);
 				if (!data) {
 					return -1;
 				}
-				// printf("Sprite[%d] (%d,%d) : ps=%d pal=%d\n", i, sff->sprites[i]->Group, sff->sprites[i]->Number, ps, sff->sprites[i]->palidx);
 				break;
 			case 2:
 				data = readSpriteDataV2(sff->sprites[i], file, xofs, size, sff);
@@ -1008,7 +946,6 @@ int loadMugenSprite(const char *filename, Sff *sff) {
 				fprintf(stderr, "Warning: unsupported sprite version: %d.x.x.x\n", sff->header.Ver0);
 				break;
 			}
-			// printf("Sprite[%d] (%d,%d) : Size %ux%u\n", i, sff->sprites[i].Group, sff->sprites[i].Number, sff->sprites[i].Size[0], sff->sprites[i].Size[1]);
 			if (data) {
 				sff->sprites[i].texture_id = generateTextureFromSprite(sff->sprites[i].Size[0], sff->sprites[i].Size[1], data);
 				free(data);
@@ -1036,6 +973,7 @@ int loadMugenSprite(const char *filename, Sff *sff) {
 		// }
 		// printSprite(&sff->sprites[i]);
 	}
+
 	// if SFF == v1 then update total palette
 	if (sff->header.Ver0 == 1) {
 		sff->header.NumberOfPalettes = sff->palettes.size();

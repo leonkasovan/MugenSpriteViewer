@@ -1,5 +1,5 @@
-// Optimized SDL2 + OpenGL Sprite Renderer using Uniforms (Modern Way)
-// Author: ChatGPT + You (awesome team!)
+// Mugen Sprite (SFF) Viewer
+// by leonkasovan@gmail.com, (c) 27 April 2025
 
 #include "mugen_sff.h"
 #include "imgui.h"
@@ -113,48 +113,16 @@ void setupQuad() {
     glBindVertexArray(0);
 }
 
-// GLuint generatePaletteTexture() {
-//     GLuint tex;
-//     float palette[256 * 4];
-//     for (int i = 0; i < 256; ++i) {
-//         palette[i * 4 + 0] = 0.0f;
-//         palette[i * 4 + 1] = 0.0f;
-//         palette[i * 4 + 2] = i / 255.0f;
-//         palette[i * 4 + 3] = i?0.0f:1.0f;
-//     }
-
-//     glGenTextures(1, &tex);
-//     glBindTexture(GL_TEXTURE_2D, tex);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-//     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_FLOAT, palette);
-
-//     return tex;
-// }
-
-// GLuint generateTexture(int width, int height) {
-//     GLuint tex;
-//     unsigned char* data = (unsigned char*)malloc(width * height);
-//     for (int i = 0; i < width * height; ++i)
-//         data[i] = (170 - width) + (i % width);
-
-//     glGenTextures(1, &tex);
-//     glBindTexture(GL_TEXTURE_2D, tex);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-//     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-//     glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, width, height, 0, GL_RED, GL_UNSIGNED_BYTE, data);
-
-//     free(data);
-//     return tex;
-// }
-
-// void renderSprite(GLuint texture, GLuint paletteTex, float x, float y, float width, float height, int windowWidth, int windowHeight) {
-void renderSprite(Sprite &spr, GLuint paletteTex, float x, float y) {
+void renderSprite(Sprite &spr, GLuint paletteTex, float x, float y, float scale = 1.0f) {
     glUseProgram(shaderProgram);
     glBindVertexArray(quadVAO);
 
+    // New: scaled size
+    float scaledWidth = spr.Size[0] * scale;
+    float scaledHeight = spr.Size[1] * scale;
+
     glUniform2f(positionLocation, x, y);
-    glUniform2f(sizeLocation, spr.Size[0], spr.Size[1]);
+    glUniform2f(sizeLocation, scaledWidth, scaledHeight);
     glUniform2f(windowSizeLocation, Window_w, Window_h);
 
     glActiveTexture(GL_TEXTURE0);
@@ -168,6 +136,7 @@ void renderSprite(Sprite &spr, GLuint paletteTex, float x, float y) {
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     glBindVertexArray(0);
 }
+
 
 int main(int argc, char*argv[]) {
     if (argc <= 1) {
@@ -216,7 +185,7 @@ int main(int argc, char*argv[]) {
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
     SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-    SDL_Window* window = SDL_CreateWindow("Mugen Sprite Viewer by leonkasovan@gmail.com", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Window_w, Window_h, window_flags);
+    SDL_Window* window = SDL_CreateWindow("Mugen Sprite Viewer v1.0", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Window_w, Window_h, window_flags);
     if (window == nullptr)
     {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
@@ -244,7 +213,8 @@ int main(int argc, char*argv[]) {
 
     // Sprite Global Variable
     Sff sff;
-    int64_t spr_idx = 0;   // Sprite index to be displayed
+    static int64_t spr_idx = 0;   // Sprite index to be displayed
+    static float spr_zoom = 1.0f;
 
     // Generating Sprite's Texture and Palette's Texture from SFF file
     if (loadMugenSprite(argv[1], &sff) != 0){
@@ -306,11 +276,6 @@ int main(int argc, char*argv[]) {
                     default:
                         break;
                 }
-
-                if (spr_idx>=sff.header.NumberOfSprites)
-                    spr_idx = sff.header.NumberOfSprites - 1;
-                if (spr_idx<0)
-                    spr_idx = 0;
             }
         }
 
@@ -319,50 +284,90 @@ int main(int argc, char*argv[]) {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
 
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-        {
-            // static float f = 0.0f;
-            // static int counter = 0;
+        ImGui::Begin("Mugen Sprite Information");
+        ImGui::Text("Filename: %s", sff.filename);
+        ImGui::Text("Version: %d.%d.%d.%d", sff.header.Ver0, sff.header.Ver1, sff.header.Ver2, sff.header.Ver3);
+        ImGui::Text("Total Sprites: %u", sff.header.NumberOfSprites);
+        ImGui::Text("Total Palettes: %u", sff.header.NumberOfPalettes);
+        ImGui::End();
 
-            ImGui::Begin("Mugen Sprite Information");
-            ImGui::Text("Filename: %s", sff.filename);
-            ImGui::Text("Version: %d.%d.%d.%d", sff.header.Ver0, sff.header.Ver1, sff.header.Ver2, sff.header.Ver3);
-            ImGui::Text("Total Sprites: %u", sff.header.NumberOfSprites);
-            ImGui::Text("Total Palettes: %u", sff.header.NumberOfPalettes);
-            // ImGui::Checkbox("Another Window", &show_another_window);
+        if (spr_idx>=sff.header.NumberOfSprites)
+            spr_idx = sff.header.NumberOfSprites - 1;
+        if (spr_idx<0)
+            spr_idx = 0;
+        Sprite &s = sff.sprites[spr_idx];
+        
+        ImGui::Begin("Active Sprite");
+        ImGui::Text("No: %ld", spr_idx);
+        ImGui::Text("Group: %d,%d", s.Group, s.Number);
+        ImGui::Text("Size: %dx%d", s.Size[0], s.Size[1]);
+        ImGui::Text("Palette No: %d", s.palidx);
+        ImGui::Text("Compression: %s", sff.header.Ver0 == 2 ? compression_code[-s.rle].c_str() : "PCX");
+        if (sff.header.Ver0 == 2) {
+            ImGui::Text("Color depth: %d", s.coldepth);
+        }
+        // ImGui::Text("Rendering %.1f fps", io.Framerate);
+        // ImGui::SliderFloat("Zoom", &spr_zoom, 0.1f, 10.0f);
+        ImGui::End();
 
-            // ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            // ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+        ImGui::Begin("Image Preview");
+        ImGui::Text("Use mouse wheel to browse sprite");
+        ImGui::Text("Use right button and mouse wheel to zoom");
 
-            // if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-            //     counter++;
-            // ImGui::SameLine();
-            // ImGui::Text("counter = %d", counter);
+        // Get window info
+        ImVec2 avail_size = ImGui::GetContentRegionAvail();
+        ImVec2 window_pos = ImGui::GetWindowPos();
+        ImVec2 cursor_pos = ImGui::GetCursorPos();
+        ImVec2 draw_pos = ImVec2(window_pos.x + cursor_pos.x, window_pos.y + cursor_pos.y);
 
-            ImGui::Text("Rendering %.1f fps", io.Framerate);
-            ImGui::End();
-
-            Sprite &s = sff.sprites[spr_idx];
-            ImGui::Begin("Active Sprite");
-            ImGui::Text("Index: %ld (%d,%d)", spr_idx, s.Group, s.Number);
-            ImGui::Text("Size: %dx%d", s.Size[0], s.Size[1]);
-            ImGui::Text("Palette: %d", s.palidx);
-            ImGui::Text("Compression: %s", sff.header.Ver0 == 2 ? compression_code[-s.rle].c_str() : "PCX");
-            if (sff.header.Ver0 == 2) {
-                ImGui::Text("Color depth: %d", s.coldepth);
+        // Handle mouse wheel zoom inside Image Preview
+        if (ImGui::IsWindowHovered()) {
+            ImGuiIO& io = ImGui::GetIO();
+            float wheel = io.MouseWheel; // +1 up, -1 down
+            if (wheel != 0.0f) {
+                if (io.MouseDown[1]) {
+                    float zoomSpeed = 0.1f;
+                    spr_zoom += -wheel * zoomSpeed;
+                    if (spr_zoom < 0.1f) spr_zoom = 0.1f; // clamp minimum zoom
+                    if (spr_zoom > 10.0f) spr_zoom = 10.0f; // clamp maximum zoom
+                } else {
+                    if (wheel > 0) spr_idx--; else spr_idx++; // next / prev sprite
+                }
             }
-            ImGui::End();
         }
 
-        // 3. Show another simple window.
-        // if (show_another_window)
-        // {
-        //     ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-        //     ImGui::Text("Hello from another window!");
-        //     if (ImGui::Button("Close Me"))
-        //         show_another_window = false;
-        //     ImGui::End();
-        // }
+        // Compute scaled size
+        float scaledWidth = s.Size[0] * spr_zoom;
+        float scaledHeight = s.Size[1] * spr_zoom;
+
+        // Center position based on zoom
+        float offset_x = (avail_size.x - scaledWidth) * 0.5f;
+        float offset_y = (avail_size.y - scaledHeight) * 0.5f;
+        draw_pos.x += offset_x;
+        draw_pos.y += offset_y;
+
+        // Reserve layout space
+        ImGui::Dummy(avail_size);
+
+        // Show zoom percentage
+        char buf[32];
+        snprintf(buf, sizeof(buf), "Zoom: %.0f%%", spr_zoom * 100.0f);
+        ImVec2 text_size = ImGui::CalcTextSize(buf);
+
+        // New: Draw text at left-bottom corner
+        ImVec2 text_pos = ImVec2(ImGui::GetWindowPos().x + 5,
+                                ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - text_size.y - 5);
+ 
+        // Optional: dark background behind text
+        ImVec2 padding = ImVec2(4, 2);
+        ImVec2 rect_min = ImVec2(text_pos.x - padding.x, text_pos.y - padding.y);
+        ImVec2 rect_max = ImVec2(text_pos.x + text_size.x + padding.x, text_pos.y + text_size.y + padding.y);
+
+        ImGui::GetForegroundDrawList()->AddRectFilled(rect_min, rect_max, IM_COL32(0, 0, 100, 255), 4.0f);
+        ImGui::GetForegroundDrawList()->AddText(text_pos, IM_COL32(255, 255, 255, 255), buf);
+
+        ImGui::End();
+
 
         // ImGui Rendering
         ImGui::Render();
@@ -371,12 +376,13 @@ int main(int argc, char*argv[]) {
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        Sprite &s = sff.sprites[spr_idx];
-        renderSprite(s, sff.palettes[s.palidx].texture_id, 400 - s.Offset[0], 240 - s.Offset[1]);
+        // Custom Sprite Rendering
+        renderSprite(s, sff.palettes[s.palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
 
         SDL_GL_SwapWindow(window);
     }
 
+    // Clean up
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
