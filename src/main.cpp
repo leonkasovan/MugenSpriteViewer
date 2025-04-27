@@ -106,14 +106,14 @@ void setupQuad() {
     glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
 
-    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*) 0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*) (2 * sizeof(float)));
     glEnableVertexAttribArray(1);
     glBindVertexArray(0);
 }
 
-void renderSprite(Sprite &spr, GLuint paletteTex, float x, float y, float scale = 1.0f) {
+void renderSprite(Sprite& spr, GLuint paletteTex, float x, float y, float scale = 1.0f) {
     glUseProgram(shaderProgram);
     glBindVertexArray(quadVAO);
 
@@ -138,15 +138,14 @@ void renderSprite(Sprite &spr, GLuint paletteTex, float x, float y, float scale 
 }
 
 
-int main(int argc, char*argv[]) {
+int main(int argc, char* argv[]) {
     if (argc <= 1) {
-        printf("MugenSpriteViewer\nUsage: %s [filenname]\n", argv[0]);
+        printf("MugenSpriteViewer\nUsage: %s [filename]\n", argv[0]);
         return -1;
     }
 
     // Setup SDL
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0)
-    {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
         printf("Error: %s\n", SDL_GetError());
         return -1;
     }
@@ -184,10 +183,9 @@ int main(int argc, char*argv[]) {
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+    SDL_WindowFlags window_flags = (SDL_WindowFlags) (SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
     SDL_Window* window = SDL_CreateWindow("Mugen Sprite Viewer v1.0", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, Window_w, Window_h, window_flags);
-    if (window == nullptr)
-    {
+    if (window == nullptr) {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
         return -1;
     }
@@ -197,7 +195,7 @@ int main(int argc, char*argv[]) {
     SDL_GL_SetSwapInterval(1); // Enable vsync
 
     // Load OpenGL Extention via glad
-    if (!gladLoadGLLoader((GLADloadproc)SDL_GL_GetProcAddress)) {
+    if (!gladLoadGLLoader((GLADloadproc) SDL_GL_GetProcAddress)) {
         fprintf(stderr, "Failed to initialize GLAD\n");
         return -1;
     }
@@ -217,7 +215,7 @@ int main(int argc, char*argv[]) {
     static float spr_zoom = 1.0f;
 
     // Generating Sprite's Texture and Palette's Texture from SFF file
-    if (loadMugenSprite(argv[1], &sff) != 0){
+    if (loadMugenSprite(argv[1], &sff) != 0) {
         fprintf(stderr, "Failed to load Mugen Sprite %s\n", argv[1]);
         return -1;
     }
@@ -225,7 +223,7 @@ int main(int argc, char*argv[]) {
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO& io = ImGui::GetIO(); (void) io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 
@@ -245,36 +243,33 @@ int main(int argc, char*argv[]) {
     bool done = false;
     while (!done) {
         SDL_Event event;
-        while (SDL_PollEvent(&event))
-        {
+        while (SDL_PollEvent(&event)) {
             ImGui_ImplSDL2_ProcessEvent(&event);
             if (event.type == SDL_QUIT)
                 done = true;
             if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window))
                 done = true;
 
-            if (event.type == SDL_KEYDOWN)
-            {
-                switch (event.key.keysym.sym)
-                {
-                    case SDLK_SPACE:
-                    case SDLK_RIGHT:
-                    case SDLK_PAGEDOWN:
-                        spr_idx++;
-                        break;
-                    case SDLK_BACKSPACE:
-                    case SDLK_PAGEUP:
-                    case SDLK_LEFT:
-                        spr_idx--;
-                        break;
-                    case SDLK_HOME:
-                        spr_idx = 0;
-                        break;
-                    case SDLK_END:
-                        spr_idx = sff.header.NumberOfSprites - 1;
-                        break;
-                    default:
-                        break;
+            if (event.type == SDL_KEYDOWN) {
+                switch (event.key.keysym.sym) {
+                case SDLK_SPACE:
+                case SDLK_RIGHT:
+                case SDLK_PAGEDOWN:
+                    spr_idx++;
+                    break;
+                case SDLK_BACKSPACE:
+                case SDLK_PAGEUP:
+                case SDLK_LEFT:
+                    spr_idx--;
+                    break;
+                case SDLK_HOME:
+                    spr_idx = 0;
+                    break;
+                case SDLK_END:
+                    spr_idx = sff.header.NumberOfSprites - 1;
+                    break;
+                default:
+                    break;
                 }
             }
         }
@@ -291,14 +286,14 @@ int main(int argc, char*argv[]) {
         ImGui::Text("Total Palettes: %u", sff.header.NumberOfPalettes);
         ImGui::End();
 
-        if (spr_idx>=sff.header.NumberOfSprites)
+        if (spr_idx >= sff.header.NumberOfSprites)
             spr_idx = sff.header.NumberOfSprites - 1;
-        if (spr_idx<0)
+        if (spr_idx < 0)
             spr_idx = 0;
-        Sprite &s = sff.sprites[spr_idx];
-        
+        Sprite& s = sff.sprites[spr_idx];
+
         ImGui::Begin("Active Sprite");
-        ImGui::Text("No: %ld", spr_idx);
+        ImGui::Text("No: %lld", spr_idx);
         ImGui::Text("Group: %d,%d", s.Group, s.Number);
         ImGui::Text("Size: %dx%d", s.Size[0], s.Size[1]);
         ImGui::Text("Palette No: %d", s.palidx);
@@ -356,8 +351,8 @@ int main(int argc, char*argv[]) {
 
         // New: Draw text at left-bottom corner
         ImVec2 text_pos = ImVec2(ImGui::GetWindowPos().x + 5,
-                                ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - text_size.y - 5);
- 
+            ImGui::GetWindowPos().y + ImGui::GetWindowSize().y - text_size.y - 5);
+
         // Optional: dark background behind text
         ImVec2 padding = ImVec2(4, 2);
         ImVec2 rect_min = ImVec2(text_pos.x - padding.x, text_pos.y - padding.y);
@@ -371,7 +366,7 @@ int main(int argc, char*argv[]) {
 
         // ImGui Rendering
         ImGui::Render();
-        glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
+        glViewport(0, 0, (int) io.DisplaySize.x, (int) io.DisplaySize.y);
         glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -390,7 +385,7 @@ int main(int argc, char*argv[]) {
     glDeleteVertexArrays(1, &quadVAO);
     glDeleteBuffers(1, &quadVBO);
     glDeleteProgram(shaderProgram);
-    
+
     deleteMugenSprite(sff);
 
     SDL_GL_DeleteContext(gl_context);
