@@ -361,6 +361,14 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        float max_width  = avail_size.x / s.Size[0];
+        float max_height = avail_size.y / s.Size[1];
+        float max_zoom   = (s.Size[0] > s.Size[1]) ? max_width : max_height;
+
+        if (spr_zoom > max_zoom || spr_zoom < 1.0f) {
+            spr_zoom = (max_zoom < 1.0f) ? max_zoom : 1.0f;
+        }
+
         // Compute scaled size
         float scaledWidth = s.Size[0] * spr_zoom;
         float scaledHeight = s.Size[1] * spr_zoom;
