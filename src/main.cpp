@@ -227,6 +227,8 @@ int main(int argc, char* argv[]) {
     SetShader(g_PalettedShaderProgram);  // use g_PalettedShaderProgram as default shader
     
     setupQuad();
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     g_texLocation = glGetUniformLocation(g_shaderProgram, "tex");
     g_paletteLocation = glGetUniformLocation(g_shaderProgram, "paletteTex");
