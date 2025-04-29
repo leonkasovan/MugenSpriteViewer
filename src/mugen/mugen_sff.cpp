@@ -64,6 +64,21 @@ GLuint generateTextureFromSprite(GLuint spr_w, GLuint spr_h, uint8_t* spr_px) {
 	return tex;
 }
 
+GLuint generateTextureRGBAFromSprite(GLuint spr_w, GLuint spr_h, uint8_t* spr_px) {
+	uint tex;
+
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	// glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, spr_w, spr_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, spr_px);
+	// printf("generateTextureFromSprite: spr_w=%u spr_h=%u\n", spr_w, spr_h);
+	return tex;
+}
+
 void printSprite(Sprite* sprite) {
 	printf("Sprite: Group %d, Number %d, Size (%d,%d), Offset (%d,%d), palidx %d, rle %d, coldepth %d\n",
 		sprite->Group, sprite->Number,
@@ -367,7 +382,7 @@ void spriteCopy(Sprite& dst, const Sprite& src) {
 	dst.texture_id = src.texture_id;
 }
 
-uint8_t* RlePcxDecode(Sprite& s, uint8_t* srcPx, size_t srcLen) {
+uint8_t* RlePcxDecode(Sprite &s, uint8_t* srcPx, size_t srcLen) {
 	if (srcLen == 0) {
 		fprintf(stderr, "Warning: PCX data length is zero\n");
 		return NULL;
@@ -375,7 +390,7 @@ uint8_t* RlePcxDecode(Sprite& s, uint8_t* srcPx, size_t srcLen) {
 
 	size_t dstLen = s.Size[0] * s.Size[1];
 	// printf("\nAllocating memory for PCX decoded data dstLen=%zu (%dx%d)\n", dstLen, s.Size[0], s.Size[1]);
-	uint8_t* dstPx = (uint8_t*) malloc(dstLen);
+	uint8_t* dstPx = (uint8_t*)malloc(dstLen);
 	if (!dstPx) {
 		fprintf(stderr, "Error allocating memory for PCX decoded data dstLen=%zu srcLen=%zu (%dx%d)\n", dstLen, srcLen, s.Size[0], s.Size[1]);
 		return NULL;
@@ -602,7 +617,10 @@ uint8_t* PngDecode(Sprite& s, uint8_t* data, uint32_t datasize) {
 		return NULL;
 	}
 
-	state.info_raw.colortype = LCT_RGBA;
+	if (s.rle == -10)
+		state.info_raw.colortype = LCT_PALETTE;
+	else
+		state.info_raw.colortype = LCT_RGBA;
 
 	if (state.info_png.color.bitdepth == 16)
 		state.info_raw.bitdepth = 16;
@@ -725,7 +743,7 @@ uint8_t* readSpriteDataV1(Sprite& s, FILE* file, Sff* sff, uint64_t offset, uint
 		return NULL;
 	}
 	if (fread(srcPx, srcLen, 1, file) != 1) {
-		fprintf(stderr, "Error reading sprite PCX data pixel. srcLen=%lld datasize=%d palSize=%d\n", srcLen, datasize, palSize);
+		fprintf(stderr, "Error reading sprite PCX data pixel\n");
 		return NULL;
 	}
 
@@ -781,23 +799,21 @@ uint8_t* readSpriteDataV2(Sprite& s, FILE* file, uint64_t offset, uint32_t datas
 		int format = -s.rle;
 		int rc;
 
-		if (2 <= format && format <= 4) {
-			if (datasize < 4) {
-				datasize = 4;
-			}
-			srcLen = datasize - 4;
-			srcPx = (uint8_t*) malloc(srcLen);
-			if (!srcPx) {
-				fprintf(stderr, "Error allocating memory for sprite data\n");
-				return NULL;
-			}
-			// printf("srcPx=%p srcLen=%ld\n", srcPx, srcLen);
-			rc = fread(srcPx, srcLen, 1, file);
-			if (rc != 1) {
-				fprintf(stderr, "Error reading V2 RLE sprite data (len=%lld). RC=%d.\n", srcLen, rc);
-				free(srcPx);
-				return NULL;
-			}
+		if (datasize < 4) {
+			datasize = 4;
+		}
+		srcLen = datasize - 4;
+		srcPx = (uint8_t*) malloc(srcLen);
+		if (!srcPx) {
+			fprintf(stderr, "Error allocating memory for sprite data\n");
+			return NULL;
+		}
+		// printf("srcPx=%p srcLen=%ld\n", srcPx, srcLen);
+		rc = fread(srcPx, srcLen, 1, file);
+		if (rc != 1) {
+			fprintf(stderr, "Error reading V2 RLE sprite data.\n");
+			free(srcPx);
+			return NULL;
 		}
 
 		switch (format) {
@@ -810,21 +826,10 @@ uint8_t* readSpriteDataV2(Sprite& s, FILE* file, uint64_t offset, uint32_t datas
 		case 4:
 			px = Lz5Decode(s, srcPx, srcLen);
 			break;
-
 		case 10:
 		case 11:
 		case 12:
-			srcPx = (uint8_t*) malloc(datasize);
-			if (!srcPx) {
-				fprintf(stderr, "Error allocating memory for sprite data\n");
-				return NULL;
-			}
-			if (fread(srcPx, datasize, 1, file) != 1) {
-				fprintf(stderr, "Error reading V2 PNG sprite data\n");
-				free(srcPx);
-				return NULL;
-			}
-			px = PngDecode(s, srcPx, datasize);
+			px = PngDecode(s, srcPx, srcLen);
 			break;
 		}
 		free(srcPx);
@@ -832,8 +837,8 @@ uint8_t* readSpriteDataV2(Sprite& s, FILE* file, uint64_t offset, uint32_t datas
 	return px;
 }
 
-int loadMugenSprite(const char* filename, Sff* sff) {
-	FILE* file;
+int loadMugenSprite(const char *filename, Sff *sff) {
+	FILE *file;
 	file = fopen(filename, "rb");
 	if (!file) {
 		printf("Error: can not open file %s\n", filename);
@@ -949,7 +954,10 @@ int loadMugenSprite(const char* filename, Sff* sff) {
 				break;
 			}
 			if (data) {
-				sff->sprites[i].texture_id = generateTextureFromSprite(sff->sprites[i].Size[0], sff->sprites[i].Size[1], data);
+				if (sff->sprites[i].rle == -11 || sff->sprites[i].rle == -12)	// PNG Image (RGBA)
+					sff->sprites[i].texture_id = generateTextureRGBAFromSprite(sff->sprites[i].Size[0], sff->sprites[i].Size[1], data);
+				else	// Paletted Image (R only)
+					sff->sprites[i].texture_id = generateTextureFromSprite(sff->sprites[i].Size[0], sff->sprites[i].Size[1], data);
 				free(data);
 			}
 
@@ -984,7 +992,7 @@ int loadMugenSprite(const char* filename, Sff* sff) {
 	return 0;
 }
 
-void deleteMugenSprite(Sff& sff) {
+void deleteMugenSprite(Sff &sff) {
 	uint32_t i;
 	for (i = 0; i < sff.header.NumberOfPalettes; i++) {
 		glDeleteTextures(1, &sff.palettes[i].texture_id);

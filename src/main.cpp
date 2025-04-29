@@ -21,9 +21,9 @@
 #define Window_h 480
 
 // Global variable
-GLuint shaderProgram;
-GLuint quadVAO, quadVBO;
-GLint texLocation, paletteLocation, positionLocation, sizeLocation, windowSizeLocation;
+GLuint g_shaderProgram, g_RGBAShaderProgram, g_PalettedShaderProgram;
+GLuint g_quadVAO, g_quadVBO;
+GLint g_texLocation, g_paletteLocation, g_positionLocation, g_sizeLocation, g_windowSizeLocation;
 
 std::map<int, std::string> compression_code = {
     {1, "PCX"},
@@ -35,7 +35,7 @@ std::map<int, std::string> compression_code = {
     {12, "PNG12"}
 };
 
-const char* vertexShaderSource = R"(
+const char* global_vertexShaderSource = R"(
 #version 330 core
 layout (location = 0) in vec2 aPos;
 layout (location = 1) in vec2 aTexCoord;
@@ -55,7 +55,8 @@ void main() {
     TexCoord = aTexCoord;
 })";
 
-const char* fragmentShaderSource = R"(
+// Shader for The Paletted texture
+const char* Paletted_fragmentShaderSource = R"(
 #version 330 core
 in vec2 TexCoord;
 out vec4 FragColor;
@@ -64,6 +65,23 @@ uniform sampler2D paletteTex;
 void main() {
     FragColor = texture(paletteTex, vec2(texture(tex, TexCoord).r, 0.5));
 })";
+
+// Shader for The RGBA texture
+const char* RGBA_fragmentShaderSource = R"(
+#version 330 core
+in vec2 TexCoord; // Received from vertex shader
+out vec4 FragColor; 
+uniform sampler2D tex; 
+void main() {
+    FragColor = texture(tex, TexCoord);
+})";
+
+void SetShader(GLuint program) {
+    if (g_shaderProgram != program) {
+        glUseProgram(program);
+        g_shaderProgram = program;
+    }
+}
 
 GLuint compileShader(GLenum type, const char* source) {
     GLuint shader = glCreateShader(type);
@@ -79,7 +97,7 @@ GLuint compileShader(GLenum type, const char* source) {
     return shader;
 }
 
-GLuint createShaderProgram() {
+GLuint createShaderProgram(const char *vertexShaderSource, const char *fragmentShaderSource) {
     GLuint vert = compileShader(GL_VERTEX_SHADER, vertexShaderSource);
     GLuint frag = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
     GLuint prog = glCreateProgram();
@@ -100,10 +118,10 @@ void setupQuad() {
         1.0f, 1.0f,     1.0f, 1.0f
     };
 
-    glGenVertexArrays(1, &quadVAO);
-    glGenBuffers(1, &quadVBO);
-    glBindVertexArray(quadVAO);
-    glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+    glGenVertexArrays(1, &g_quadVAO);
+    glGenBuffers(1, &g_quadVBO);
+    glBindVertexArray(g_quadVAO);
+    glBindBuffer(GL_ARRAY_BUFFER, g_quadVBO);
     glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), quadVertices, GL_STATIC_DRAW);
 
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*) 0);
@@ -113,25 +131,28 @@ void setupQuad() {
     glBindVertexArray(0);
 }
 
-void renderSprite(Sprite& spr, GLuint paletteTex, float x, float y, float scale = 1.0f) {
-    glUseProgram(shaderProgram);
-    glBindVertexArray(quadVAO);
+void renderSprite(Sprite &spr, GLuint paletteTex, float x, float y, float scale = 1.0f) {
+    if (spr.rle == -12 || spr.rle == -11)
+        SetShader(g_RGBAShaderProgram);
+    else
+        SetShader(g_PalettedShaderProgram);
+    glBindVertexArray(g_quadVAO);
 
     // New: scaled size
     float scaledWidth = spr.Size[0] * scale;
     float scaledHeight = spr.Size[1] * scale;
 
-    glUniform2f(positionLocation, x, y);
-    glUniform2f(sizeLocation, scaledWidth, scaledHeight);
-    glUniform2f(windowSizeLocation, Window_w, Window_h);
+    glUniform2f(g_positionLocation, x, y);
+    glUniform2f(g_sizeLocation, scaledWidth, scaledHeight);
+    glUniform2f(g_windowSizeLocation, Window_w, Window_h);
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, spr.texture_id);
-    glUniform1i(texLocation, 0);
+    glUniform1i(g_texLocation, 0);
 
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, paletteTex);
-    glUniform1i(paletteLocation, 1);
+    glUniform1i(g_paletteLocation, 1);
 
     glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     glBindVertexArray(0);
@@ -200,14 +221,18 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    shaderProgram = createShaderProgram();
+    // Setup shader
+    g_RGBAShaderProgram = createShaderProgram(global_vertexShaderSource, RGBA_fragmentShaderSource);
+    g_PalettedShaderProgram = createShaderProgram(global_vertexShaderSource, Paletted_fragmentShaderSource);
+    SetShader(g_PalettedShaderProgram);  // use g_PalettedShaderProgram as default shader
+    
     setupQuad();
 
-    texLocation = glGetUniformLocation(shaderProgram, "tex");
-    paletteLocation = glGetUniformLocation(shaderProgram, "paletteTex");
-    positionLocation = glGetUniformLocation(shaderProgram, "uPosition");
-    sizeLocation = glGetUniformLocation(shaderProgram, "uSize");
-    windowSizeLocation = glGetUniformLocation(shaderProgram, "uWindowSize");
+    g_texLocation = glGetUniformLocation(g_shaderProgram, "tex");
+    g_paletteLocation = glGetUniformLocation(g_shaderProgram, "paletteTex");
+    g_positionLocation = glGetUniformLocation(g_shaderProgram, "uPosition");
+    g_sizeLocation = glGetUniformLocation(g_shaderProgram, "uSize");
+    g_windowSizeLocation = glGetUniformLocation(g_shaderProgram, "uWindowSize");
 
     // Sprite Global Variable
     Sff sff;
@@ -293,7 +318,12 @@ int main(int argc, char* argv[]) {
         Sprite& s = sff.sprites[spr_idx];
 
         ImGui::Begin("Active Sprite");
+        #ifdef __MINGW64__
         ImGui::Text("No: %lld", spr_idx);
+        #else
+        ImGui::Text("No: %ld", spr_idx);
+        #endif
+        
         ImGui::Text("Group: %d,%d", s.Group, s.Number);
         ImGui::Text("Size: %dx%d", s.Size[0], s.Size[1]);
         ImGui::Text("Palette No: %d", s.palidx);
@@ -382,10 +412,10 @@ int main(int argc, char* argv[]) {
     ImGui_ImplSDL2_Shutdown();
     ImGui::DestroyContext();
 
-    glDeleteVertexArrays(1, &quadVAO);
-    glDeleteBuffers(1, &quadVBO);
-    glDeleteProgram(shaderProgram);
-
+    glDeleteVertexArrays(1, &g_quadVAO);
+    glDeleteBuffers(1, &g_quadVBO);
+    glDeleteProgram(g_shaderProgram);
+    
     deleteMugenSprite(sff);
 
     SDL_GL_DeleteContext(gl_context);
