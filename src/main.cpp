@@ -9,11 +9,18 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <filesystem>
 #include <SDL.h>
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <SDL_opengles2.h>
 #else
 #include <SDL_opengl.h>
+#endif
+#ifdef _WIN32
+    #include <windows.h>
+#else
+    #include <unistd.h>
+    #include <limits.h>
 #endif
 
 
@@ -75,6 +82,21 @@ uniform sampler2D tex;
 void main() {
     FragColor = texture(tex, TexCoord);
 })";
+
+std::string getExecutableDirectory() {
+#ifdef _WIN32
+    char path[MAX_PATH];
+    GetModuleFileNameA(NULL, path, MAX_PATH); // A version = narrow char
+    std::filesystem::path exe_path(path);
+    return exe_path.parent_path().string();
+#else
+    char path[PATH_MAX];
+    ssize_t count = readlink("/proc/self/exe", path, PATH_MAX);
+    if (count == -1) return ".";
+    std::filesystem::path exe_path(std::string(path, count));
+    return exe_path.parent_path().string();
+#endif
+}
 
 void SetShader(GLuint program) {
     if (g_shaderProgram != program) {
@@ -251,6 +273,8 @@ int main(int argc, char* argv[]) {
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void) io;
+    static std::string ini_path = getExecutableDirectory() + "/imgui.ini";
+    io.IniFilename = ini_path.c_str();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
 

@@ -37,7 +37,7 @@ OBJS := $(OBJS:.c=.o)  # Also replace .c with .o
 UNAME_S := $(shell uname -s)
 
 # Compiler flags
-CXXFLAGS = -std=c++11 -I$(SRC_DIR) -I$(MUGEN_DIR) -I$(LODEPNG_DIR) -I$(IMGUI_DIR) -I$(IMGUI_BACKENDS_DIR) -I$(GLAD_DIR)
+CXXFLAGS = -std=c++17 -I$(SRC_DIR) -I$(MUGEN_DIR) -I$(LODEPNG_DIR) -I$(IMGUI_DIR) -I$(IMGUI_BACKENDS_DIR) -I$(GLAD_DIR)
 CXXFLAGS += -O2 -Wall -Wformat
 LIBS =
 
