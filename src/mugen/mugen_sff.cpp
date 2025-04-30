@@ -65,7 +65,7 @@ GLuint generateTextureFromSprite(GLuint spr_w, GLuint spr_h, uint8_t* spr_px) {
 }
 
 GLuint generateTextureRGBAFromSprite(GLuint spr_w, GLuint spr_h, uint8_t* spr_px) {
-	uint tex;
+	GLuint tex;
 
 	glGenTextures(1, &tex);
 	glBindTexture(GL_TEXTURE_2D, tex);
@@ -382,7 +382,7 @@ void spriteCopy(Sprite& dst, const Sprite& src) {
 	dst.texture_id = src.texture_id;
 }
 
-uint8_t* RlePcxDecode(Sprite &s, uint8_t* srcPx, size_t srcLen) {
+uint8_t* RlePcxDecode(Sprite& s, uint8_t* srcPx, size_t srcLen) {
 	if (srcLen == 0) {
 		fprintf(stderr, "Warning: PCX data length is zero\n");
 		return NULL;
@@ -390,7 +390,7 @@ uint8_t* RlePcxDecode(Sprite &s, uint8_t* srcPx, size_t srcLen) {
 
 	size_t dstLen = s.Size[0] * s.Size[1];
 	// printf("\nAllocating memory for PCX decoded data dstLen=%zu (%dx%d)\n", dstLen, s.Size[0], s.Size[1]);
-	uint8_t* dstPx = (uint8_t*)malloc(dstLen);
+	uint8_t* dstPx = (uint8_t*) malloc(dstLen);
 	if (!dstPx) {
 		fprintf(stderr, "Error allocating memory for PCX decoded data dstLen=%zu srcLen=%zu (%dx%d)\n", dstLen, srcLen, s.Size[0], s.Size[1]);
 		return NULL;
@@ -837,8 +837,8 @@ uint8_t* readSpriteDataV2(Sprite& s, FILE* file, uint64_t offset, uint32_t datas
 	return px;
 }
 
-int loadMugenSprite(const char *filename, Sff *sff) {
-	FILE *file;
+int loadMugenSprite(const char* filename, Sff* sff) {
+	FILE* file;
 	file = fopen(filename, "rb");
 	if (!file) {
 		printf("Error: can not open file %s\n", filename);
@@ -992,7 +992,7 @@ int loadMugenSprite(const char *filename, Sff *sff) {
 	return 0;
 }
 
-void deleteMugenSprite(Sff &sff) {
+void deleteMugenSprite(Sff& sff) {
 	uint32_t i;
 	for (i = 0; i < sff.header.NumberOfPalettes; i++) {
 		glDeleteTextures(1, &sff.palettes[i].texture_id);

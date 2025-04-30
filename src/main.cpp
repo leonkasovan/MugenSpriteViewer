@@ -17,10 +17,10 @@
 #include <SDL_opengl.h>
 #endif
 #ifdef _WIN32
-    #include <windows.h>
+#include <windows.h>
 #else
-    #include <unistd.h>
-    #include <limits.h>
+#include <unistd.h>
+#include <limits.h>
 #endif
 
 
@@ -119,7 +119,7 @@ GLuint compileShader(GLenum type, const char* source) {
     return shader;
 }
 
-GLuint createShaderProgram(const char *vertexShaderSource, const char *fragmentShaderSource) {
+GLuint createShaderProgram(const char* vertexShaderSource, const char* fragmentShaderSource) {
     GLuint vert = compileShader(GL_VERTEX_SHADER, vertexShaderSource);
     GLuint frag = compileShader(GL_FRAGMENT_SHADER, fragmentShaderSource);
     GLuint prog = glCreateProgram();
@@ -153,7 +153,7 @@ void setupQuad() {
     glBindVertexArray(0);
 }
 
-void renderSprite(Sprite &spr, GLuint paletteTex, float x, float y, float scale = 1.0f) {
+void renderSprite(Sprite& spr, GLuint paletteTex, float x, float y, float scale = 1.0f) {
     if (spr.rle == -12 || spr.rle == -11)
         SetShader(g_RGBAShaderProgram);
     else
@@ -247,7 +247,7 @@ int main(int argc, char* argv[]) {
     g_RGBAShaderProgram = createShaderProgram(global_vertexShaderSource, RGBA_fragmentShaderSource);
     g_PalettedShaderProgram = createShaderProgram(global_vertexShaderSource, Paletted_fragmentShaderSource);
     SetShader(g_PalettedShaderProgram);  // use g_PalettedShaderProgram as default shader
-    
+
     setupQuad();
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -262,6 +262,7 @@ int main(int argc, char* argv[]) {
     Sff sff;
     static int64_t spr_idx = 0;   // Sprite index to be displayed
     static float spr_zoom = 1.0f;
+    static bool spr_auto_animate = false; // Auto animate sprite
 
     // Generating Sprite's Texture and Palette's Texture from SFF file
     if (loadMugenSprite(argv[1], &sff) != 0) {
@@ -303,7 +304,6 @@ int main(int argc, char* argv[]) {
 
             if (event.type == SDL_KEYDOWN) {
                 switch (event.key.keysym.sym) {
-                case SDLK_SPACE:
                 case SDLK_RIGHT:
                 case SDLK_PAGEDOWN:
                     spr_idx++;
@@ -316,12 +316,28 @@ int main(int argc, char* argv[]) {
                 case SDLK_HOME:
                     spr_idx = 0;
                     break;
+                case SDLK_ESCAPE:
+                case SDLK_q:
+                    done = true;
+                    break;
                 case SDLK_END:
                     spr_idx = sff.header.NumberOfSprites - 1;
+                    break;
+                case SDLK_SPACE:
+                    spr_auto_animate = !spr_auto_animate;
                     break;
                 default:
                     break;
                 }
+            }
+        }
+
+        if (spr_auto_animate) {
+            // Auto animate sprite
+            SDL_Delay(80);
+            spr_idx++;
+            if (spr_idx >= sff.header.NumberOfSprites) {
+                spr_idx = 0;
             }
         }
 
@@ -344,12 +360,12 @@ int main(int argc, char* argv[]) {
         Sprite& s = sff.sprites[spr_idx];
 
         ImGui::Begin("Active Sprite");
-        #ifdef __MINGW64__
+#ifdef __MINGW64__
         ImGui::Text("No: %lld", spr_idx);
-        #else
+#else
         ImGui::Text("No: %ld", spr_idx);
-        #endif
-        
+#endif
+
         ImGui::Text("Group: %d,%d", s.Group, s.Number);
         ImGui::Text("Size: %dx%d", s.Size[0], s.Size[1]);
         ImGui::Text("Palette No: %d", s.palidx);
@@ -361,10 +377,16 @@ int main(int argc, char* argv[]) {
         // ImGui::SliderFloat("Zoom", &spr_zoom, 0.1f, 10.0f);
         ImGui::End();
 
-        ImGui::Begin("Image Preview");
+        ImGui::Begin("Help");
         ImGui::Text("Use mouse wheel to browse sprite");
-        ImGui::Text("Use right button and mouse wheel to zoom");
+        ImGui::Text("Hold mouse right button and use mouse wheel to zoom");
+        ImGui::Text("Press SPACE to start/stop auto animation");
+        ImGui::Text("Press HOME to go to first sprite");
+        ImGui::Text("Press END to go to last sprite");
+        ImGui::Text("Press ESC or Q to quit");
+        ImGui::End();
 
+        ImGui::Begin("Image Preview");
         // Get window info
         ImVec2 avail_size = ImGui::GetContentRegionAvail();
         ImVec2 window_pos = ImGui::GetWindowPos();
@@ -387,9 +409,9 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        float max_width  = avail_size.x / s.Size[0];
+        float max_width = avail_size.x / s.Size[0];
         float max_height = avail_size.y / s.Size[1];
-        float max_zoom   = (s.Size[0] > s.Size[1]) ? max_width : max_height;
+        float max_zoom = (s.Size[0] > s.Size[1]) ? max_width : max_height;
 
         if (spr_zoom > max_zoom || spr_zoom < 1.0f) {
             spr_zoom = (max_zoom < 1.0f) ? max_zoom : 1.0f;
@@ -449,7 +471,7 @@ int main(int argc, char* argv[]) {
     glDeleteVertexArrays(1, &g_quadVAO);
     glDeleteBuffers(1, &g_quadVBO);
     glDeleteProgram(g_shaderProgram);
-    
+
     deleteMugenSprite(sff);
 
     SDL_GL_DeleteContext(gl_context);
