@@ -21,7 +21,6 @@ GLuint generateTextureFromPaletteRGBA(uint32_t pal_rgba[256]) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pal_byte);
-	printf("Texture ID: %u\n", tex);
 
 	return tex;
 }
@@ -36,7 +35,6 @@ GLuint generateTextureFromPaletteRGB(rgb_t pal_rgb[256]) {
 		pal_byte[i * 4 + 1] = pal_rgb[i].g;
 		pal_byte[i * 4 + 2] = pal_rgb[i].b;
 		pal_byte[i * 4 + 3] = i ? 0xFF : 0x00;  // Set alpha to 0 for the first color (or 1.0 if required)
-		printf("pal_rgba[%d] = %d,%d,%d,%d\n", i, pal_byte[i * 4 + 0], pal_byte[i * 4 + 1], pal_byte[i * 4 + 2], pal_byte[i * 4 + 3]);
 	}
 
 	glGenTextures(1, &tex);
@@ -47,7 +45,6 @@ GLuint generateTextureFromPaletteRGB(rgb_t pal_rgb[256]) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pal_byte);
-	printf("Texture ID: %u\n", tex);
 
 	return tex;
 }

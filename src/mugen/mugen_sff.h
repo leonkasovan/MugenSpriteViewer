@@ -70,8 +70,8 @@ public:
 	// Constructor from .ACT filename
 	Palette(const char* actFilename) {
 		rgb_t pal_rgb[256];
+		rgb_t rgb;
 		FILE* file = fopen(actFilename, "rb");
-		printf("\n[mugen_sff.h] Open palette file: %s\n", actFilename);
 		if (!file) {
 			memset(pal_rgb, 0, sizeof(rgb_t) * 256);
 			printf("Failed to open palette file: %s\n", actFilename);
@@ -84,6 +84,23 @@ public:
 			printf("Failed to read palette data from file: %s\n", actFilename);
 		}
 		fclose(file);
+		// Fix for ACT : Swap RGB values
+		for (int i = 0; i < 128; i++) {
+			rgb = pal_rgb[i];
+			pal_rgb[i] = pal_rgb[255 - i];
+			pal_rgb[255 - i] = rgb;
+			// rgb.r = pal_rgb[i].r;
+			// rgb.g = pal_rgb[i].g;
+			// rgb.b = pal_rgb[i].b;
+
+			// pal_rgb[i].r = pal_rgb[255 - i].r;
+			// pal_rgb[i].g = pal_rgb[255 - i].g;
+			// pal_rgb[i].b = pal_rgb[255 - i].b;
+
+			// pal_rgb[255 - i].r = rgb.r;
+			// pal_rgb[255 - i].g = rgb.g;
+			// pal_rgb[255 - i].b = rgb.b;
+		}
 		texture_id = generateTextureFromPaletteRGB(pal_rgb);
 	}
 };
