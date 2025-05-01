@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <stdint.h>
 #include <filesystem>
+#include <cstring>
 #include <SDL.h>
 #if defined(IMGUI_IMPL_OPENGL_ES2)
 #include <SDL_opengles2.h>
@@ -83,6 +84,36 @@ void main() {
     FragColor = texture(tex, TexCoord);
 })";
 
+inline bool isACT(const std::filesystem::path& path) {
+    auto ext = path.extension().string();
+    if (ext.length() != 4 || ext[0] != '.') return false;
+    return (ext[1] == 'a' || ext[1] == 'A') &&
+        (ext[2] == 'c' || ext[2] == 'C') &&
+        (ext[3] == 't' || ext[3] == 'T');
+}
+
+// Find and Populate files
+std::vector<std::string> findACTFiles(const std::filesystem::path& root = std::filesystem::current_path()) {
+    std::vector<std::string> files;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
+        if (entry.is_regular_file() && isACT(entry.path())) {
+            files.push_back(entry.path().string());
+        }
+    }
+    return files;
+}
+
+std::vector<Palette> generateTextureFromPalettes(std::vector<std::string> pals) {
+    std::vector<Palette> result;
+    result.reserve(pals.size());  // Optional: reserve for efficiency
+
+    for (const auto& path : pals) {
+        result.emplace_back(path.c_str());  // Calls Palette(const char* actFilename)
+    }
+
+    return result;
+}
+
 std::string getExecutableDirectory() {
 #ifdef _WIN32
     char path[MAX_PATH];
@@ -96,6 +127,17 @@ std::string getExecutableDirectory() {
     std::filesystem::path exe_path(std::string(path, count));
     return exe_path.parent_path().string();
 #endif
+}
+
+const char* getFilename(const char* fullpath) {
+    if (!fullpath) return "";
+
+    const char* slash1 = std::strrchr(fullpath, '/');  // Unix-style
+    const char* slash2 = std::strrchr(fullpath, '\\'); // Windows-style
+
+    const char* lastSlash = slash1 > slash2 ? slash1 : slash2;
+
+    return lastSlash ? lastSlash + 1 : fullpath;
 }
 
 void SetShader(GLuint program) {
@@ -263,6 +305,10 @@ int main(int argc, char* argv[]) {
     static int64_t spr_idx = 0;   // Sprite index to be displayed
     static float spr_zoom = 1.0f;
     static bool spr_auto_animate = false; // Auto animate sprite
+    size_t spr_selectedPalIndex = 0;
+    std::vector<std::string> opt_palette_paths = findACTFiles(); // Find ACT files from the current directory
+    std::vector<Palette> opt_palettes = generateTextureFromPalettes(opt_palette_paths); // Texture palettes from ACT files
+    bool useOptPalette = false; // Use optional palette
 
     // Generating Sprite's Texture and Palette's Texture from SFF file
     if (loadMugenSprite(argv[1], &sff) != 0) {
@@ -347,7 +393,7 @@ int main(int argc, char* argv[]) {
         ImGui::NewFrame();
 
         ImGui::Begin("Mugen Sprite Information");
-        ImGui::Text("Filename: %s", sff.filename);
+        ImGui::Text("Filename: %s", getFilename(sff.filename));
         ImGui::Text("Version: %d.%d.%d.%d", sff.header.Ver0, sff.header.Ver1, sff.header.Ver2, sff.header.Ver3);
         ImGui::Text("Total Sprites: %u", sff.header.NumberOfSprites);
         ImGui::Text("Total Palettes: %u", sff.header.NumberOfPalettes);
@@ -369,12 +415,38 @@ int main(int argc, char* argv[]) {
         ImGui::Text("Group: %d,%d", s.Group, s.Number);
         ImGui::Text("Size: %dx%d", s.Size[0], s.Size[1]);
         ImGui::Text("Palette No: %d", s.palidx);
+        ImGui::Checkbox("Use Additional Palette", &useOptPalette);
         ImGui::Text("Compression: %s", sff.header.Ver0 == 2 ? compression_code[-s.rle].c_str() : "PCX");
         if (sff.header.Ver0 == 2) {
             ImGui::Text("Color depth: %d", s.coldepth);
         }
         // ImGui::Text("Rendering %.1f fps", io.Framerate);
         // ImGui::SliderFloat("Zoom", &spr_zoom, 0.1f, 10.0f);
+        ImGui::End();
+
+        ImGui::Begin("Additional Palettes");
+        ImGui::BeginListBox("##pal_listbox", ImVec2(-FLT_MIN, 200));
+        for (size_t i = 0; i < opt_palette_paths.size(); ++i) {
+            const bool isSelected = (spr_selectedPalIndex == i);
+            if (ImGui::Selectable(getFilename(opt_palette_paths[i].c_str()), isSelected)) {
+                spr_selectedPalIndex = i;
+            }
+            if (isSelected) {
+                ImGui::SetItemDefaultFocus();
+            }
+            // Handle mouse double-click
+            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                // Double-click action here
+                useOptPalette = true;
+            }
+
+            // Handle keyboard Enter (if this item is selected and Enter is pressed)
+            if (isSelected && ImGui::IsWindowFocused() &&
+                ImGui::IsKeyPressed(ImGuiKey_Enter, false)) {
+                useOptPalette = true;
+            }
+        }
+        ImGui::EndListBox();
         ImGui::End();
 
         ImGui::Begin("Help");
@@ -458,7 +530,11 @@ int main(int argc, char* argv[]) {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         // Custom Sprite Rendering
-        renderSprite(s, sff.palettes[s.palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
+        if (useOptPalette) {
+            renderSprite(s, opt_palettes[spr_selectedPalIndex].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
+        } else {
+            renderSprite(s, sff.palettes[s.palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
+        }
 
         SDL_GL_SwapWindow(window);
     }
