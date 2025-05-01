@@ -12,6 +12,13 @@
 3. Load additional palette (*.act)
 4. Auto resize image preview
 
+### Install
+Download from here:  
+Windows 7/10/11 : https://github.com/leonkasovan/MugenSpriteViewer/releases/download/v1.0/MugenSpriteViewer-win64-v1.0.zip  
+Linux x86_64 : https://github.com/leonkasovan/MugenSpriteViewer/releases/download/v1.0/MugenSpriteViewer-linux-x86_64-v1.0.zip  
+Extract and run it from command line.  
+Or register it in Windows to handle SFF file.  
+
 ### Usage:
 ```
 # MugenSpriteViewer.exe kfmZ.sff
@@ -23,7 +30,7 @@
 By registering in windows explorer (Open with ...) to handle SFF file.  
 After registering, just double click any SFF file to view it.  
 
-##Build from source:
+### Build from source:
 ```
 git clone https://github.com/leonkasovan/MugenSpriteViewer.git
 make
