@@ -427,8 +427,7 @@ int main(int argc, char* argv[]) {
 
         if (opt_palettes.size()) {
             ImGui::Begin("Additional Palettes");
-            // ImGui::BeginListBox("##pal_listbox", ImVec2(-FLT_MIN, 100));
-            ImGui::BeginListBox("##pal_listbox");
+            ImGui::BeginListBox("##pal_listbox", ImVec2(-FLT_MIN, -FLT_MIN));
             for (size_t i = 0; i < opt_palette_paths.size(); ++i) {
                 const bool isSelected = (o_palidx == i);
                 if (ImGui::Selectable(getFilename(opt_palette_paths[i].c_str()), isSelected)) {
