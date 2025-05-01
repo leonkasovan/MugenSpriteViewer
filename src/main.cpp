@@ -305,10 +305,10 @@ int main(int argc, char* argv[]) {
     static int64_t spr_idx = 0;   // Sprite index to be displayed
     static float spr_zoom = 1.0f;
     static bool spr_auto_animate = false; // Auto animate sprite
-    size_t spr_selectedPalIndex = 0;
+    size_t o_palidx = 0;
     std::vector<std::string> opt_palette_paths = findACTFiles(); // Find ACT files from the current directory
     std::vector<Palette> opt_palettes = generateTextureFromPalettes(opt_palette_paths); // Texture palettes from ACT files
-    bool useOptPalette = false; // Use optional palette
+    bool useOptPalette = false; // Use optional palette instead of internal palette
 
     // Generating Sprite's Texture and Palette's Texture from SFF file
     if (loadMugenSprite(argv[1], &sff) != 0) {
@@ -414,40 +414,44 @@ int main(int argc, char* argv[]) {
 
         ImGui::Text("Group: %d,%d", s.Group, s.Number);
         ImGui::Text("Size: %dx%d", s.Size[0], s.Size[1]);
-        ImGui::Text("Palette No: %d", s.palidx);
-        ImGui::Checkbox("Use Additional Palette", &useOptPalette);
         ImGui::Text("Compression: %s", sff.header.Ver0 == 2 ? compression_code[-s.rle].c_str() : "PCX");
         if (sff.header.Ver0 == 2) {
             ImGui::Text("Color depth: %d", s.coldepth);
         }
+        ImGui::Text("Palette No: %d", s.palidx);
+        if (opt_palettes.size())
+            ImGui::Checkbox("Use Additional Palette", &useOptPalette);
         // ImGui::Text("Rendering %.1f fps", io.Framerate);
         // ImGui::SliderFloat("Zoom", &spr_zoom, 0.1f, 10.0f);
         ImGui::End();
 
-        ImGui::Begin("Additional Palettes");
-        ImGui::BeginListBox("##pal_listbox", ImVec2(-FLT_MIN, 200));
-        for (size_t i = 0; i < opt_palette_paths.size(); ++i) {
-            const bool isSelected = (spr_selectedPalIndex == i);
-            if (ImGui::Selectable(getFilename(opt_palette_paths[i].c_str()), isSelected)) {
-                spr_selectedPalIndex = i;
-            }
-            if (isSelected) {
-                ImGui::SetItemDefaultFocus();
-            }
-            // Handle mouse double-click
-            if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-                // Double-click action here
-                useOptPalette = true;
-            }
+        if (opt_palettes.size()) {
+            ImGui::Begin("Additional Palettes");
+            // ImGui::BeginListBox("##pal_listbox", ImVec2(-FLT_MIN, 100));
+            ImGui::BeginListBox("##pal_listbox");
+            for (size_t i = 0; i < opt_palette_paths.size(); ++i) {
+                const bool isSelected = (o_palidx == i);
+                if (ImGui::Selectable(getFilename(opt_palette_paths[i].c_str()), isSelected)) {
+                    o_palidx = i;
+                }
+                if (isSelected) {
+                    ImGui::SetItemDefaultFocus();
+                }
+                // Handle mouse double-click
+                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
+                    // Double-click action here
+                    useOptPalette = true;
+                }
 
-            // Handle keyboard Enter (if this item is selected and Enter is pressed)
-            if (isSelected && ImGui::IsWindowFocused() &&
-                ImGui::IsKeyPressed(ImGuiKey_Enter, false)) {
-                useOptPalette = true;
+                // Handle keyboard Enter (if this item is selected and Enter is pressed)
+                if (isSelected && ImGui::IsWindowFocused() &&
+                    ImGui::IsKeyPressed(ImGuiKey_Enter, false)) {
+                    useOptPalette = true;
+                }
             }
+            ImGui::EndListBox();
+            ImGui::End();
         }
-        ImGui::EndListBox();
-        ImGui::End();
 
         ImGui::Begin("Help");
         ImGui::Text("Use mouse wheel to browse sprite");
@@ -518,9 +522,7 @@ int main(int argc, char* argv[]) {
 
         ImGui::GetForegroundDrawList()->AddRectFilled(rect_min, rect_max, IM_COL32(0, 0, 100, 255), 4.0f);
         ImGui::GetForegroundDrawList()->AddText(text_pos, IM_COL32(255, 255, 255, 255), buf);
-
         ImGui::End();
-
 
         // ImGui Rendering
         ImGui::Render();
@@ -531,7 +533,7 @@ int main(int argc, char* argv[]) {
 
         // Custom Sprite Rendering
         if (useOptPalette) {
-            renderSprite(s, opt_palettes[spr_selectedPalIndex].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
+            renderSprite(s, opt_palettes[o_palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
         } else {
             renderSprite(s, sff.palettes[s.palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
         }
