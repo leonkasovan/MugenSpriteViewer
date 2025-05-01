@@ -31,10 +31,49 @@ GLuint generateTextureFromPaletteRGB(rgb_t pal_rgb[256]) {
 
 	// Convert the RGB values into bytes (0-255 range for each channel)
 	for (int i = 0; i < 256; i++) {
-		pal_byte[i * 4 + 0] = pal_rgb[i].r;
-		pal_byte[i * 4 + 1] = pal_rgb[i].g;
-		pal_byte[i * 4 + 2] = pal_rgb[i].b;
-		pal_byte[i * 4 + 3] = i ? 0xFF : 0x00;  // Set alpha to 0 for the first color (or 1.0 if required)
+		pal_byte[i * 4 + 0] = i ? pal_rgb[i].r : 0;
+		pal_byte[i * 4 + 1] = i ? pal_rgb[i].g : 0;
+		pal_byte[i * 4 + 2] = i ? pal_rgb[i].b : 0;
+		pal_byte[i * 4 + 3] = i ? 255 : 0;  // Set alpha to 0 for the first color (or 1.0 if required)
+	}
+
+	glGenTextures(1, &tex);
+	glBindTexture(GL_TEXTURE_2D, tex);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pal_byte);
+
+	return tex;
+}
+
+GLuint generateTextureFromPaletteACT(const char* actFilename) {
+	GLuint tex;
+	uint8_t pal_byte[256 * 4];
+	rgb_t pal_rgb[256];
+
+	FILE* file = fopen(actFilename, "rb");
+	if (!file) {
+		memset(pal_rgb, 0, sizeof(rgb_t) * 256);
+		printf("Failed to open palette file: %s\n", actFilename);
+	}
+
+	size_t read = fread(pal_rgb, sizeof(pal_rgb), 1, file); // Read 256 RGB triplets
+	if (read != 1) {
+		memset(pal_rgb, 0, sizeof(rgb_t) * 256);
+		printf("Failed to read palette data from file: %s\n", actFilename);
+	}
+	fclose(file);
+
+	// Convert the RGB values into bytes (0-255 range for each channel) in reverse order
+	for (int i = 0; i < 256; i++) {
+		pal_byte[i * 4 + 0] = pal_rgb[255 - i].r;
+		pal_byte[i * 4 + 1] = pal_rgb[255 - i].g;
+		pal_byte[i * 4 + 2] = pal_rgb[255 - i].b;
+		pal_byte[i * 4 + 3] = i ? 255 : 0;
+		// pal_byte[i * 4 + 3] = i == 255 ? 0 : 255;	// in some char, this works :(
 	}
 
 	glGenTextures(1, &tex);
