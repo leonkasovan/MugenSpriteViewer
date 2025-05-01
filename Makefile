@@ -81,3 +81,7 @@ $(EXE): $(OBJS)
 
 clean:
 	rm -f $(EXE) $(OBJS)
+
+install: $(EXE)
+	strip -s $(EXE)
+	install -m 755 $(EXE) /f/PortableApps/MugenSpriteViewer-win64/$(EXE)

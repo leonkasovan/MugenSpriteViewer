@@ -21,6 +21,7 @@ GLuint generateTextureFromPaletteRGBA(uint32_t pal_rgba[256]) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pal_byte);
+	printf("Texture ID: %u\n", tex);
 
 	return tex;
 }
@@ -35,6 +36,7 @@ GLuint generateTextureFromPaletteRGB(rgb_t pal_rgb[256]) {
 		pal_byte[i * 4 + 1] = pal_rgb[i].g;
 		pal_byte[i * 4 + 2] = pal_rgb[i].b;
 		pal_byte[i * 4 + 3] = i ? 0xFF : 0x00;  // Set alpha to 0 for the first color (or 1.0 if required)
+		printf("pal_rgba[%d] = %d,%d,%d,%d\n", i, pal_byte[i * 4 + 0], pal_byte[i * 4 + 1], pal_byte[i * 4 + 2], pal_byte[i * 4 + 3]);
 	}
 
 	glGenTextures(1, &tex);
@@ -45,6 +47,7 @@ GLuint generateTextureFromPaletteRGB(rgb_t pal_rgb[256]) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, pal_byte);
+	printf("Texture ID: %u\n", tex);
 
 	return tex;
 }
@@ -60,7 +63,6 @@ GLuint generateTextureFromSprite(GLuint spr_w, GLuint spr_h, uint8_t* spr_px) {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, spr_w, spr_h, 0, GL_RED, GL_UNSIGNED_BYTE, spr_px);
-	// printf("generateTextureFromSprite: spr_w=%u spr_h=%u\n", spr_w, spr_h);
 	return tex;
 }
 
@@ -75,7 +77,6 @@ GLuint generateTextureRGBAFromSprite(GLuint spr_w, GLuint spr_h, uint8_t* spr_px
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, spr_w, spr_h, 0, GL_RGBA, GL_UNSIGNED_BYTE, spr_px);
-	// printf("generateTextureFromSprite: spr_w=%u spr_h=%u\n", spr_w, spr_h);
 	return tex;
 }
 
@@ -389,7 +390,6 @@ uint8_t* RlePcxDecode(Sprite& s, uint8_t* srcPx, size_t srcLen) {
 	}
 
 	size_t dstLen = s.Size[0] * s.Size[1];
-	// printf("\nAllocating memory for PCX decoded data dstLen=%zu (%dx%d)\n", dstLen, s.Size[0], s.Size[1]);
 	uint8_t* dstPx = (uint8_t*) malloc(dstLen);
 	if (!dstPx) {
 		fprintf(stderr, "Error allocating memory for PCX decoded data dstLen=%zu srcLen=%zu (%dx%d)\n", dstLen, srcLen, s.Size[0], s.Size[1]);
@@ -680,31 +680,6 @@ int readPcxHeader(Sprite& s, FILE* file, uint64_t offset) {
 	return 0;
 }
 
-void get_basename_no_ext(const char* path, char* out, size_t out_size) {
-	if (!path || !out || out_size == 0) return;
-
-	// Find the last path separator
-	const char* last_slash = strrchr(path, '/');
-	const char* last_backslash = strrchr(path, '\\');
-	const char* filename = path;
-
-	if (last_slash || last_backslash) {
-		filename = (last_slash > last_backslash) ? last_slash + 1 : last_backslash + 1;
-	}
-
-	// Find the last dot (extension)
-	const char* last_dot = strrchr(filename, '.');
-	size_t len = last_dot ? (size_t) (last_dot - filename) : strlen(filename);
-
-	// Ensure we don't overflow the buffer
-	if (len >= out_size) {
-		len = out_size - 1;
-	}
-
-	strncpy(out, filename, len);
-	out[len] = '\0';
-}
-
 uint8_t* readSpriteDataV1(Sprite& s, FILE* file, Sff* sff, uint64_t offset, uint32_t datasize, uint32_t nextSubheader, Sprite* prev, bool c00) {
 	if (nextSubheader > offset) {
 		// Ignore datasize except last
@@ -733,7 +708,6 @@ uint8_t* readSpriteDataV1(Sprite& s, FILE* file, Sff* sff, uint64_t offset, uint
 	if (datasize < 128 + palSize) {
 		datasize = 128 + palSize;
 	}
-	// printf("[DEBUG] src/main.cpp:%d\n", __LINE__);
 
 	uint8_t* px = NULL;
 	size_t srcLen = datasize - (128 + palSize);
@@ -808,7 +782,6 @@ uint8_t* readSpriteDataV2(Sprite& s, FILE* file, uint64_t offset, uint32_t datas
 			fprintf(stderr, "Error allocating memory for sprite data\n");
 			return NULL;
 		}
-		// printf("srcPx=%p srcLen=%ld\n", srcPx, srcLen);
 		rc = fread(srcPx, srcLen, 1, file);
 		if (rc != 1) {
 			fprintf(stderr, "Error reading V2 RLE sprite data.\n");
@@ -977,10 +950,6 @@ int loadMugenSprite(const char* filename, Sff* sff) {
 			shofs += 28;
 		}
 
-		// Set default opt_palidx for sprite with Group 0 and Number 0
-		// if (sff->sprites[i].Group == 0 && sff->sprites[i].Number == 0 && opt_palidx == 0) {
-		// 	opt_palidx = sff->sprites[i]->palidx;
-		// }
 		// printSprite(&sff->sprites[i]);
 	}
 

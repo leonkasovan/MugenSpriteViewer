@@ -24,6 +24,8 @@ typedef struct __attribute__((packed)) {
 	uint8_t b;
 } rgb_t;
 
+extern GLuint generateTextureFromPaletteRGB(rgb_t pal_rgb[256]);
+
 // SFF
 typedef struct {
 	uint8_t Ver3, Ver2, Ver1, Ver0;
@@ -65,6 +67,25 @@ public:
 	unsigned int texture_id;
 
 	Palette(unsigned int id) : texture_id(id) {}
+	// Constructor from .ACT filename
+	Palette(const char* actFilename) {
+		rgb_t pal_rgb[256];
+		FILE* file = fopen(actFilename, "rb");
+		printf("\n[mugen_sff.h] Open palette file: %s\n", actFilename);
+		if (!file) {
+			memset(pal_rgb, 0, sizeof(rgb_t) * 256);
+			printf("Failed to open palette file: %s\n", actFilename);
+			return;
+		}
+
+		size_t read = fread(pal_rgb, sizeof(pal_rgb), 1, file); // Read 256 RGB triplets
+		if (read != 1) {
+			memset(pal_rgb, 0, sizeof(rgb_t) * 256);
+			printf("Failed to read palette data from file: %s\n", actFilename);
+		}
+		fclose(file);
+		texture_id = generateTextureFromPaletteRGB(pal_rgb);
+	}
 };
 
 typedef struct {
