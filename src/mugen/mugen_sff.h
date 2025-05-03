@@ -12,11 +12,16 @@
 #include <array>
 #include <string>
 #include <algorithm>
+#include <stdexcept>
+
+#ifdef _WIN32
+#include <windows.h>
+#else
+#include <dlfcn.h>
+#endif
 
 #include "lodepng.h"
 #include "glad.h"
-
-#define MAX_PALETTES 64
 
 typedef struct __attribute__((packed)) {
 	uint8_t r;
@@ -84,6 +89,53 @@ typedef struct {
 	int usePalette;
 } Atlas;
 
+class DynamicLib {
+public:
+	DynamicLib(const std::string& path) {
+#ifdef _WIN32
+		handle = LoadLibraryA(path.c_str());
+		if (!handle) {
+			throw std::runtime_error("Failed to load library: " + path);
+		}
+#else
+		handle = dlopen(path.c_str(), RTLD_LAZY);
+		if (!handle) {
+			throw std::runtime_error(std::string("Failed to load library: ") + dlerror());
+		}
+#endif
+	}
+
+	~DynamicLib() {
+#ifdef _WIN32
+		if (handle) FreeLibrary((HMODULE) handle);
+#else
+		if (handle) dlclose(handle);
+#endif
+	}
+
+	template<typename Func>
+	Func get(const std::string& name) {
+#ifdef _WIN32
+		FARPROC symbol = GetProcAddress((HMODULE) handle, name.c_str());
+		if (!symbol) {
+			throw std::runtime_error("Failed to find symbol: " + name);
+		}
+		return reinterpret_cast<Func>(symbol);
+#else
+		dlerror(); // clear any old error
+		void* symbol = dlsym(handle, name.c_str());
+		const char* error = dlerror();
+		if (error) {
+			throw std::runtime_error(std::string("Failed to find symbol: ") + error);
+		}
+		return reinterpret_cast<Func>(symbol);
+#endif
+	}
+
+private:
+	void* handle = nullptr;
+};
+
 // Load Sprite from file
 int readSffHeader(Sff* sff, FILE* file, uint32_t* lofs, uint32_t* tofs);
 int readSpriteHeaderV1(Sprite* sprite, FILE* file, uint32_t* ofs, uint32_t* size, uint16_t* link);
@@ -95,3 +147,5 @@ void spriteCopy(Sprite* dst, const Sprite* src);
 void printSprite(Sprite* sprite);
 int loadMugenSprite(const char* filename, Sff* sff);
 void deleteMugenSprite(Sff& sff);
+int exportPalettedSpriteAsPng(Sprite& s, GLuint pal_texture_id, const char* filename);
+int exportRGBASpriteAsPng(Sprite& s, const char* filename);

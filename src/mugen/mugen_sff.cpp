@@ -708,11 +708,7 @@ int readPcxHeader(Sprite& s, FILE* file, uint64_t offset) {
 	}
 	s.Size[0] = rect[2] - rect[0] + 1;
 	s.Size[1] = rect[3] - rect[1] + 1;
-	if (encoding == 1) {
-		s.rle = bpl;
-	} else {
-		s.rle = 0;
-	}
+	s.rle = -1;	// -1 for PCX
 	return 0;
 }
 
@@ -1005,4 +1001,88 @@ void deleteMugenSprite(Sff& sff) {
 	for (i = 0; i < sff.header.NumberOfSprites; i++) {
 		glDeleteTextures(1, &sff.sprites[i].texture_id);
 	}
+}
+
+int exportRGBASpriteAsPng(Sprite& s, const char* filename) {
+	if (s.rle != -11 && s.rle != -12) {	// PNG Image (RGBA)
+		fprintf(stderr, "Error: sprite is not a RGBA image\n");
+		return -1;
+	}
+
+	LodePNGState state;
+	lodepng_state_init(&state);
+
+	// Set color type to RGBA
+	state.info_raw.colortype = LCT_RGBA;
+	state.info_raw.bitdepth = 8;
+	state.info_png.color.colortype = LCT_RGBA;
+	state.info_png.color.bitdepth = 8;
+
+	// Load the sprite data from GPU
+	uint8_t data[s.Size[0] * s.Size[1] * 4]; // 4 bytes per pixel (RGBA)
+	glBindTexture(GL_TEXTURE_2D, s.texture_id);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);  // Ensure byte-aligned rows
+	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+
+	// Save the PNG file
+	unsigned char* png = NULL;
+	size_t pngsize = 0;
+	int err_code = lodepng_encode(&png, &pngsize, data, s.Size[0], s.Size[1], &state);
+	if (!err_code) {
+		err_code = lodepng_save_file(png, pngsize, filename);
+		if (err_code) {
+			fprintf(stderr, "Error saving PNG file: %s\n", lodepng_error_text(err_code));
+		}
+	} else {
+		fprintf(stderr, "Error encoding PNG data: %s\n", lodepng_error_text(err_code));
+	}
+	return 0;
+}
+
+int exportPalettedSpriteAsPng(Sprite& s, GLuint pal_texture_id, const char* filename) {
+	if (s.rle != -1 && s.rle != -2 && s.rle != -3 && s.rle != -4 && s.rle != -10) {	// Paletted Image (R only)
+		fprintf(stderr, "Error: sprite is not a paletted image. Compression method: %d\n", s.rle);
+		return -1;
+	}
+
+	LodePNGState state;
+	lodepng_state_init(&state);
+	// Set color type to palette
+	state.info_raw.colortype = LCT_PALETTE;
+	state.info_raw.bitdepth = 8;
+	state.info_png.color.colortype = LCT_PALETTE;
+	state.info_png.color.bitdepth = 8;
+
+	// Load the palette RGBA data from palette texture (in GPU)
+	uint8_t palette_rgba[256 * 4]; // 256 colors, 4 bytes per color (RGBA)
+	glBindTexture(GL_TEXTURE_2D, pal_texture_id);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);  // Ensure byte-aligned rows
+	glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, palette_rgba);
+	for (int i = 0; i < 256; i++) {
+		// lodepng_palette_add(&state.info_raw, R,G,B,A);
+		lodepng_palette_add(&state.info_raw, palette_rgba[i * 4 + 0], palette_rgba[i * 4 + 1], palette_rgba[i * 4 + 2], palette_rgba[i * 4 + 3]);
+	}
+	lodepng_palette_add(&state.info_png.color, 0, 0, 0, 0);	// atleast one color is needed for info_png palette. it will crash if not added
+
+	// Load the sprite data from GPU
+	uint8_t data[s.Size[0] * s.Size[1]];
+	glBindTexture(GL_TEXTURE_2D, s.texture_id);
+	glPixelStorei(GL_PACK_ALIGNMENT, 1);
+	glGetTexImage(GL_TEXTURE_2D, 0, GL_RED, GL_UNSIGNED_BYTE, data);
+
+	// Save the PNG file
+	unsigned char* png = NULL;
+	size_t pngsize = 0;
+	int err_code = lodepng_encode(&png, &pngsize, data, s.Size[0], s.Size[1], &state);
+	if (!err_code) {
+		err_code = lodepng_save_file(png, pngsize, filename);
+		if (err_code) {
+			fprintf(stderr, "Error saving PNG file: %s\n", lodepng_error_text(err_code));
+		}
+	} else {
+		fprintf(stderr, "Error encoding PNG data: %s\n", lodepng_error_text(err_code));
+	}
+	lodepng_state_cleanup(&state);
+	free(png);
+	return err_code;
 }

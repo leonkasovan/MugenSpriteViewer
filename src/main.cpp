@@ -397,6 +397,15 @@ int main(int argc, char* argv[]) {
         ImGui::Text("Version: %d.%d.%d.%d", sff.header.Ver0, sff.header.Ver1, sff.header.Ver2, sff.header.Ver3);
         ImGui::Text("Total Sprites: %u", sff.header.NumberOfSprites);
         ImGui::Text("Total Palettes: %u", sff.header.NumberOfPalettes);
+        if (ImGui::BeginPopupContextWindow()) {
+            if (ImGui::MenuItem("Export All Sprite as PNG")) {
+
+            }
+            if (ImGui::MenuItem("Export Current Sprite as PNG")) {
+
+            }
+            ImGui::EndPopup();
+        }
         ImGui::End();
 
         if (spr_idx >= sff.header.NumberOfSprites)
@@ -427,28 +436,19 @@ int main(int argc, char* argv[]) {
 
         if (opt_palettes.size()) {
             ImGui::Begin("Additional Palettes");
-            ImGui::BeginListBox("##pal_listbox", ImVec2(-FLT_MIN, -FLT_MIN));
-            for (size_t i = 0; i < opt_palette_paths.size(); ++i) {
-                const bool isSelected = (o_palidx == i);
-                if (ImGui::Selectable(getFilename(opt_palette_paths[i].c_str()), isSelected)) {
-                    o_palidx = i;
+            if (ImGui::BeginListBox("##pal_listbox", ImVec2(-FLT_MIN, -FLT_MIN))) {
+                for (size_t i = 0; i < opt_palette_paths.size(); ++i) {
+                    const bool isSelected = (o_palidx == i);
+                    if (ImGui::Selectable(getFilename(opt_palette_paths[i].c_str()), isSelected)) {
+                        o_palidx = i;
+                    }
+                    if (isSelected) {
+                        ImGui::SetItemDefaultFocus();
+                    }
                 }
-                if (isSelected) {
-                    ImGui::SetItemDefaultFocus();
-                }
-                // Handle mouse double-click
-                if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) {
-                    // Double-click action here
-                    useOptPalette = true;
-                }
-
-                // Handle keyboard Enter (if this item is selected and Enter is pressed)
-                if (isSelected && ImGui::IsWindowFocused() &&
-                    ImGui::IsKeyPressed(ImGuiKey_Enter, false)) {
-                    useOptPalette = true;
-                }
+                ImGui::EndListBox();
             }
-            ImGui::EndListBox();
+
             ImGui::End();
         }
 
