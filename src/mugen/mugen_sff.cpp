@@ -1036,7 +1036,7 @@ int exportRGBASpriteAsPng(Sprite& s, const char* filename) {
 	} else {
 		fprintf(stderr, "Error encoding PNG data: %s\n", lodepng_error_text(err_code));
 	}
-	return 0;
+	return err_code;
 }
 
 int exportPalettedSpriteAsPng(Sprite& s, GLuint pal_texture_id, const char* filename) {

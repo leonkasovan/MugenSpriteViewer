@@ -129,6 +129,62 @@ std::string getExecutableDirectory() {
 #endif
 }
 
+// Get the base filename without extension
+std::string getFilenameNoExt(const char* fullpath) {
+    if (!fullpath) return "";
+
+    std::string path(fullpath);
+
+    // Find last path separator (both Unix '/' and Windows '\\')
+    size_t slashPos = path.find_last_of("/\\");
+    size_t start = (slashPos == std::string::npos) ? 0 : slashPos + 1;
+
+    // Find last dot after the last slash
+    size_t dotPos = path.find_last_of('.');
+    if (dotPos == std::string::npos || dotPos < start) {
+        dotPos = path.length();  // No extension found
+    }
+
+    return path.substr(start, dotPos - start);
+}
+
+int exportAllSpriteAsPNG(Sff& sff) {
+    char png_filename[256];
+    const char* basename = getFilenameNoExt(sff.filename).c_str();
+    size_t n_success = 0;
+    size_t n_failed = 0;
+
+    //Iterate through all sprites and export them as PNG
+    for (size_t i = 0; i < sff.header.NumberOfSprites; ++i) {
+        Sprite& spr = sff.sprites[i];
+        snprintf(png_filename, sizeof(png_filename), "%s %d_%d.png", basename, spr.Group, spr.Number);
+
+        if (spr.rle == -11 || spr.rle == -12) { // PNG Image (RGBA)
+            exportRGBASpriteAsPng(spr, png_filename) ? ++n_failed : ++n_success;
+        } else { // Paletted Image (R only)
+            exportPalettedSpriteAsPng(spr, sff.palettes[spr.palidx].texture_id, png_filename) ? ++n_failed : ++n_success;
+        }
+    }
+    // printf("Exported %zu sprites successfully, %zu failed. Total=%zu\n", n_success, n_failed, sff.sprites.size());
+    return n_success;
+}
+
+int exportCurrentSpriteAsPNG(Sprite& spr, GLuint pal_texture_id, char* filename) {
+    char png_filename[256];
+    const char* basename = getFilenameNoExt(filename).c_str();
+    size_t n_success = 0;
+    size_t n_failed = 0;
+
+    snprintf(png_filename, sizeof(png_filename), "%s_%d_%d.png", basename, spr.Group, spr.Number);
+
+    if (spr.rle == -11 || spr.rle == -12) { // PNG Image (RGBA)
+        exportRGBASpriteAsPng(spr, png_filename) ? ++n_failed : ++n_success;
+    } else { // Paletted Image (R only)
+        exportPalettedSpriteAsPng(spr, pal_texture_id, png_filename) ? ++n_failed : ++n_success;
+    }
+    return n_success;
+}
+
 const char* getFilename(const char* fullpath) {
     if (!fullpath) return "";
 
@@ -309,6 +365,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> opt_palette_paths = findACTFiles(); // Find ACT files from the current directory
     std::vector<Palette> opt_palettes = generateTextureFromPalettes(opt_palette_paths); // Texture palettes from ACT files
     bool useOptPalette = false; // Use optional palette instead of internal palette
+    size_t spr_export_success = 0;
 
     // Generating Sprite's Texture and Palette's Texture from SFF file
     if (loadMugenSprite(argv[1], &sff) != 0) {
@@ -336,6 +393,8 @@ int main(int argc, char* argv[]) {
     // Our state
     // bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+    int showModal = 0; // 0: no modal, 1: export all, 2: export current
+    const char* modalName[] = { "", "Export All Sprite", "Export Current Sprite" };
 
     // Main loop
     bool done = false;
@@ -398,15 +457,43 @@ int main(int argc, char* argv[]) {
         ImGui::Text("Total Sprites: %u", sff.header.NumberOfSprites);
         ImGui::Text("Total Palettes: %u", sff.header.NumberOfPalettes);
         if (ImGui::BeginPopupContextWindow()) {
-            if (ImGui::MenuItem("Export All Sprite as PNG")) {
-
+            if (ImGui::MenuItem(modalName[1])) {
+                spr_export_success = exportAllSpriteAsPNG(sff);
+                showModal = 1;
             }
-            if (ImGui::MenuItem("Export Current Sprite as PNG")) {
-
+            if (ImGui::MenuItem(modalName[2])) {
+                spr_export_success = exportCurrentSpriteAsPNG(sff.sprites[spr_idx], sff.palettes[sff.sprites[spr_idx].palidx].texture_id, sff.filename);
+                showModal = 2;
             }
             ImGui::EndPopup();
         }
         ImGui::End();
+
+        if (showModal) {
+            ImGui::OpenPopup(modalName[showModal]);
+            showModal = 0;
+        }
+
+        // Modal for Export All Sprites
+        if (ImGui::BeginPopupModal(modalName[1], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            ImGui::Text("%ld of %d sprites exported successfully.", spr_export_success, sff.header.NumberOfSprites);
+            if (ImGui::Button("OK")) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        // Modal for Export Current Sprite
+        if (ImGui::BeginPopupModal(modalName[2], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            if (spr_export_success > 0)
+                ImGui::Text("Sprite[%ld] exported successfully.", spr_idx);
+            else
+                ImGui::Text("Failed to export current sprite.");
+            if (ImGui::Button("OK")) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
 
         if (spr_idx >= sff.header.NumberOfSprites)
             spr_idx = sff.header.NumberOfSprites - 1;
