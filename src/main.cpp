@@ -151,16 +151,14 @@ std::string getFilenameNoExt(const char* fullpath) {
 
 int exportAllSpriteAsPNG(Sff& sff) {
     char png_filename[256];
-    // std::string basename = getFilenameNoExt(sff.filename);
-    const char* basename = getFilenameNoExt(sff.filename).c_str();
+    std::string basename = getFilenameNoExt(sff.filename);
     size_t n_success = 0;
     size_t n_failed = 0;
-    printf("basename=%s sff.filename=%s\n", basename, sff.filename);
 
     //Iterate through all sprites and export them as PNG
     for (size_t i = 0; i < sff.header.NumberOfSprites; ++i) {
         Sprite& spr = sff.sprites[i];
-        snprintf(png_filename, sizeof(png_filename), "%s %d_%d.png", basename, spr.Group, spr.Number);
+        snprintf(png_filename, sizeof(png_filename), "%s %d_%d.png", basename.c_str(), spr.Group, spr.Number);
         printf("Exporting %s\n", png_filename);
 
         if (spr.rle == -11 || spr.rle == -12) { // PNG Image (RGBA)
@@ -175,11 +173,11 @@ int exportAllSpriteAsPNG(Sff& sff) {
 
 int exportCurrentSpriteAsPNG(Sprite& spr, GLuint pal_texture_id, char* filename) {
     char png_filename[256];
-    const char* basename = getFilenameNoExt(filename).c_str();
+    std::string basename = getFilenameNoExt(filename);
     size_t n_success = 0;
     size_t n_failed = 0;
 
-    snprintf(png_filename, sizeof(png_filename), "%s_%d_%d.png", basename, spr.Group, spr.Number);
+    snprintf(png_filename, sizeof(png_filename), "%s_%d_%d.png", basename.c_str(), spr.Group, spr.Number);
 
     if (spr.rle == -11 || spr.rle == -12) { // PNG Image (RGBA)
         exportRGBASpriteAsPng(spr, png_filename) ? ++n_failed : ++n_success;
@@ -226,7 +224,7 @@ int getDefaultPaletteIndex(Sff& sff) {
 
 int exportAllSpriteAsAtlas(Sff& sff) {
     char out_filename[256];
-    const char* basename = getFilenameNoExt(sff.filename).c_str();
+    std::string basename = getFilenameNoExt(sff.filename);
     // size_t n_success = 0;
     // size_t n_failed = 0;
 
@@ -432,7 +430,7 @@ int exportAllSpriteAsAtlas(Sff& sff) {
     }
 
     // Save the atlas metadata to a text file
-    snprintf(out_filename, sizeof(out_filename), "sprite_atlas_%s.txt", basename);
+    snprintf(out_filename, sizeof(out_filename), "sprite_atlas_%s.txt", basename.c_str());
     FILE* f = fopen(out_filename, "w");
     if (f) {
         fwrite(meta, 1, meta_ptr - meta, f);
@@ -441,7 +439,7 @@ int exportAllSpriteAsAtlas(Sff& sff) {
     free(meta);
 
     // Prepare for saving the atlas as PNG
-    snprintf(out_filename, sizeof(out_filename), "sprite_atlas_%s.png", basename);
+    snprintf(out_filename, sizeof(out_filename), "sprite_atlas_%s.png", basename.c_str());
     LodePNGState state;
     lodepng_state_init(&state);
 
@@ -482,8 +480,8 @@ int exportAllSpriteAsAtlas(Sff& sff) {
 
 int exportSpriteDatabase(Sff& sff) {
     char out_filename[256];
-    const char* basename = getFilenameNoExt(sff.filename).c_str();
-    snprintf(out_filename, sizeof(out_filename), "sprite_database_%s.txt", basename);
+    std::string basename = getFilenameNoExt(sff.filename);
+    snprintf(out_filename, sizeof(out_filename), "sprite_database_%s.txt", basename.c_str());
     FILE* f = fopen(out_filename, "w");
     if (!f) {
         fprintf(stderr, "Error opening file for writing: %s\n", out_filename);
