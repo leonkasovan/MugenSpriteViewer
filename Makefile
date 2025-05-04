@@ -15,7 +15,6 @@ IMGUI_BACKENDS_DIR = $(IMGUI_DIR)/backends
 GLAD_DIR = $(SRC_DIR)/glad
 MUGEN_DIR = $(SRC_DIR)/mugen
 LODEPNG_DIR = $(SRC_DIR)/lodepng
-STB_DIR = $(SRC_DIR)/stb
 
 # Source files
 SOURCES = \
@@ -23,7 +22,6 @@ SOURCES = \
 	$(GLAD_DIR)/glad.c \
 	$(MUGEN_DIR)/mugen_sff.cpp \
 	$(LODEPNG_DIR)/lodepng.cpp \
-	$(STB_DIR)/stb_rect_pack.h \
 	$(IMGUI_DIR)/imgui.cpp \
 	$(IMGUI_DIR)/imgui_draw.cpp \
 	$(IMGUI_DIR)/imgui_tables.cpp \
@@ -39,8 +37,15 @@ OBJS := $(OBJS:.c=.o)  # Also replace .c with .o
 UNAME_S := $(shell uname -s)
 
 # Compiler flags
-CXXFLAGS = -std=c++17 -I$(SRC_DIR) -I$(MUGEN_DIR) -I$(LODEPNG_DIR) -I$(IMGUI_DIR) -I$(IMGUI_BACKENDS_DIR) -I$(GLAD_DIR) -I$(STB_DIR)
+CXXFLAGS = -std=c++17 -I$(SRC_DIR) -I$(MUGEN_DIR) -I$(LODEPNG_DIR) -I$(IMGUI_DIR) -I$(IMGUI_BACKENDS_DIR) -I$(GLAD_DIR)
+
+# If the target 'debug' is being built
+ifeq ($(MAKECMDGOALS),debug)
+CXXFLAGS += -fsanitize=address -g -DDEBUG
+else
 CXXFLAGS += -O2 -Wall -Wformat
+endif
+
 LIBS =
 
 # Platform-specific settings
@@ -71,6 +76,9 @@ endif
 all: $(EXE)
 	@echo Build complete for $(ECHO_MESSAGE)
 
+debug: $(EXE)
+	@echo Debug build complete for $(ECHO_MESSAGE)
+
 $(EXE): $(OBJS)
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(LIBS)
 
@@ -86,4 +94,5 @@ clean:
 
 install: $(EXE)
 	strip -s $(EXE)
-	install -m 755 $(EXE) /f/PortableApps/MugenSpriteViewer-win64/$(EXE)
+#	install -m 755 $(EXE) /f/PortableApps/MugenSpriteViewer-win64/$(EXE)
+	sudo install -m 755 $(EXE) /usr/bin/$(EXE)

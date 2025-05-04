@@ -22,7 +22,7 @@
 
 #include "lodepng.h"
 #include "glad.h"
-#include "stb_rect_pack.h"
+#include "imstb_rectpack.h"
 
 typedef struct __attribute__((packed)) {
 	uint8_t r;
