@@ -22,6 +22,7 @@
 
 #include "lodepng.h"
 #include "glad.h"
+#include "stb_rect_pack.h"
 
 typedef struct __attribute__((packed)) {
 	uint8_t r;
@@ -85,7 +86,6 @@ typedef struct {
 typedef struct {
 	uint16_t width, height;
 	struct stbrp_rect* rects;
-	Sff* sff;
 	int usePalette;
 } Atlas;
 

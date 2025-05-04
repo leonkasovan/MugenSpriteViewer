@@ -1012,6 +1012,9 @@ int exportRGBASpriteAsPng(Sprite& s, const char* filename) {
 	LodePNGState state;
 	lodepng_state_init(&state);
 
+	// Print sprite  information
+	printf("Group:%d,%d size=%ux%u Offset=%u,%u coldepth=%d rle=%d\n", s.Group, s.Number, s.Size[0], s.Size[1], s.Offset[0], s.Offset[1], s.coldepth, s.rle);
+
 	// Set color type to RGBA
 	state.info_raw.colortype = LCT_RGBA;
 	state.info_raw.bitdepth = 8;
@@ -1028,7 +1031,7 @@ int exportRGBASpriteAsPng(Sprite& s, const char* filename) {
 	unsigned char* png = NULL;
 	size_t pngsize = 0;
 	int err_code = lodepng_encode(&png, &pngsize, data, s.Size[0], s.Size[1], &state);
-	if (!err_code) {
+	if (!err_code && png) {
 		err_code = lodepng_save_file(png, pngsize, filename);
 		if (err_code) {
 			fprintf(stderr, "Error saving PNG file: %s\n", lodepng_error_text(err_code));
@@ -1036,6 +1039,8 @@ int exportRGBASpriteAsPng(Sprite& s, const char* filename) {
 	} else {
 		fprintf(stderr, "Error encoding PNG data: %s\n", lodepng_error_text(err_code));
 	}
+	lodepng_state_cleanup(&state);
+	if (png) free(png);
 	return err_code;
 }
 

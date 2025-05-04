@@ -1,6 +1,7 @@
 // Mugen Sprite (SFF) Viewer
 // by leonkasovan@gmail.com, (c) 27 April 2025
 
+#define STB_RECT_PACK_IMPLEMENTATION
 #include "mugen_sff.h"
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
@@ -150,14 +151,17 @@ std::string getFilenameNoExt(const char* fullpath) {
 
 int exportAllSpriteAsPNG(Sff& sff) {
     char png_filename[256];
+    // std::string basename = getFilenameNoExt(sff.filename);
     const char* basename = getFilenameNoExt(sff.filename).c_str();
     size_t n_success = 0;
     size_t n_failed = 0;
+    printf("basename=%s sff.filename=%s\n", basename, sff.filename);
 
     //Iterate through all sprites and export them as PNG
     for (size_t i = 0; i < sff.header.NumberOfSprites; ++i) {
         Sprite& spr = sff.sprites[i];
         snprintf(png_filename, sizeof(png_filename), "%s %d_%d.png", basename, spr.Group, spr.Number);
+        printf("Exporting %s\n", png_filename);
 
         if (spr.rle == -11 || spr.rle == -12) { // PNG Image (RGBA)
             exportRGBASpriteAsPng(spr, png_filename) ? ++n_failed : ++n_success;
@@ -165,7 +169,7 @@ int exportAllSpriteAsPNG(Sff& sff) {
             exportPalettedSpriteAsPng(spr, sff.palettes[spr.palidx].texture_id, png_filename) ? ++n_failed : ++n_success;
         }
     }
-    // printf("Exported %zu sprites successfully, %zu failed. Total=%zu\n", n_success, n_failed, sff.sprites.size());
+    printf("Exported %zu sprites successfully, %zu failed. Total=%zu\n", n_success, n_failed, sff.sprites.size());
     return n_success;
 }
 
@@ -183,6 +187,318 @@ int exportCurrentSpriteAsPNG(Sprite& spr, GLuint pal_texture_id, char* filename)
         exportPalettedSpriteAsPng(spr, pal_texture_id, png_filename) ? ++n_failed : ++n_success;
     }
     return n_success;
+}
+
+// Copy raw image data from sprite to a buffer
+// This function assumes that the sprite is already bound to a texture
+// Don't forget to free the allocated memory after use
+unsigned char* copyRawImageFromSprite(Sprite& spr) {
+    int width = spr.Size[0];
+    int height = spr.Size[1];
+    bool isRGBA = (spr.rle == -11 || spr.rle == -12);
+
+    unsigned char* data = (unsigned char*) malloc(width * height * (isRGBA ? 4 : 1));
+    if (!data) return NULL;
+
+    glBindTexture(GL_TEXTURE_2D, spr.texture_id);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    glGetTexImage(GL_TEXTURE_2D, 0, isRGBA ? GL_RGBA : GL_RED, GL_UNSIGNED_BYTE, data);
+
+    return data;
+}
+
+int getDefaultPaletteIndex(Sff& sff) {
+    int default_palette_index = -1;
+    for (size_t i = 0; i < sff.header.NumberOfSprites; ++i) {
+        if (sff.sprites[i].Group == 0 && sff.sprites[i].Number == 0) {
+            // Check if the sprite is a palette sprite
+            if (sff.sprites[i].rle == -1 || sff.sprites[i].rle == -2 || sff.sprites[i].rle == -3 || sff.sprites[i].rle == -4 || sff.sprites[i].rle == -10) {
+                default_palette_index = sff.sprites[i].palidx;
+                break;
+            }
+        }
+    }
+    return default_palette_index; // Default palette not found
+}
+
+#define META_LINE_LENGTH 32
+#define PALETTE_SIZE 256
+
+int exportAllSpriteAsAtlas(Sff& sff) {
+    char out_filename[256];
+    const char* basename = getFilenameNoExt(sff.filename).c_str();
+    // size_t n_success = 0;
+    // size_t n_failed = 0;
+
+    stbrp_context ctx;
+    stbrp_node* nodes = NULL;
+    char* meta = NULL;
+    uint8_t* output = NULL;
+    Atlas atlas;
+    int default_palette_index = getDefaultPaletteIndex(sff);
+
+    // Initialize atlas
+    int64_t prod = 0;
+    size_t maxw = 0, maxh = 0;
+
+    uint32_t num_sprites = sff.header.NumberOfSprites;
+    atlas.rects = (struct stbrp_rect*) calloc(num_sprites, sizeof(struct stbrp_rect));
+    if (!atlas.rects) return -1;
+
+    for (size_t i = 0; i < num_sprites; i++) {
+        Sprite& spr = sff.sprites[i];
+        bool isRGBA = (spr.rle == -11 || spr.rle == -12);
+        if (isRGBA) {
+            // atlas.rects[i].was_packed = 0; // Reset packing status for different palette index
+            continue; // Skip RGBA sprites for now
+        }
+
+        if (spr.palidx != default_palette_index) {
+            // atlas.rects[i].was_packed = 0; // Reset packing status for different palette index
+            continue; // Skip sprites with different palette index
+        }
+        // atlas.rects[i].was_packed = 1;
+
+        unsigned char* p_img = copyRawImageFromSprite(spr);
+        int64_t sw = spr.Size[0];
+        int64_t sh = spr.Size[1];
+        size_t pitch = sw;
+        // fprintf(stderr, "Packing spr[%lld] %u,%u %llux%llu (%d,%d) pal=%d rle=%d\n", i, spr.Group, spr.Number, sw, sh, spr.Offset[0], spr.Offset[1], spr.palidx, spr.rle);
+
+        spr.atlas_x = 0;
+        spr.atlas_y = 0;
+
+        if (sw > (int64_t) maxw) maxw = sw;
+        if (sh > (int64_t) maxh) maxh = sh;
+        prod += sw * sh;
+
+        // Crop top
+        while (sh > 0) {
+            int empty = 1;
+            for (int64_t x = 0; x < sw; x++) {
+                if (p_img[x + spr.atlas_y * pitch]) {
+                    empty = 0;
+                    break;
+                }
+            }
+            if (!empty) break;
+            spr.atlas_y++;
+            sh--;
+        }
+
+        // Crop bottom
+        while (sh > 0) {
+            int empty = 1;
+            for (int64_t x = 0; x < sw; x++) {
+                if (p_img[x + (spr.atlas_y + sh - 1) * pitch]) {
+                    empty = 0;
+                    break;
+                }
+            }
+            if (!empty) break;
+            sh--;
+        }
+
+        // Crop left
+        while (sw > 0) {
+            int empty = 1;
+            for (int64_t y = 0; y < sh; y++) {
+                if (p_img[(spr.atlas_y + y) * pitch + spr.atlas_x]) {
+                    empty = 0;
+                    break;
+                }
+            }
+            if (!empty) break;
+            spr.atlas_x++;
+            sw--;
+        }
+
+        // Crop right
+        while (sw > 0) {
+            int empty = 1;
+            for (int64_t y = 0; y < sh; y++) {
+                if (p_img[(spr.atlas_y + y) * pitch + spr.atlas_x + sw - 1]) {
+                    empty = 0;
+                    break;
+                }
+            }
+            if (!empty) break;
+            sw--;
+        }
+
+        if (sw < 1 || sh < 1) {
+            sw = sh = spr.atlas_x = spr.atlas_y = 0;
+        }
+
+        atlas.rects[i].id = i;
+        atlas.rects[i].w = sw;
+        atlas.rects[i].h = sh;
+
+        if (p_img) free(p_img);
+    }
+
+    fprintf(stderr, "Atlas Max width: %zu, Max height: %zu\n", maxw, maxh);
+    // Calculate atlas size rounded up to next power of two
+    size_t root = 1;
+    while (root * root < (size_t) prod) root++;
+
+    if (root < maxw) root = maxw;
+    for (atlas.width = 1; atlas.width < root; atlas.width <<= 1);
+
+    size_t rows = (prod + atlas.width - 1) / atlas.width;
+    if (rows < maxh) rows = maxh;
+    for (atlas.height = 1; atlas.height < rows; atlas.height <<= 1);
+
+    nodes = (stbrp_node*) calloc(atlas.width + 1, sizeof(stbrp_node));
+    if (!nodes) {
+        fprintf(stderr, "Error: not enough memory for stbrp nodes\n");
+        return -1;
+    }
+
+    stbrp_init_target(&ctx, atlas.width, atlas.height, nodes, atlas.width + 1);
+    if (!stbrp_pack_rects(&ctx, atlas.rects, num_sprites)) {
+        atlas.height <<= 1;
+        // memset(nodes, 0, (atlas.width + 1) * sizeof(stbrp_node));
+        for (uint32_t i = 0; i < num_sprites; i++) {
+            atlas.rects[i].was_packed = 0;
+            atlas.rects[i].x = atlas.rects[i].y = 0;
+        }
+        stbrp_init_target(&ctx, atlas.width, atlas.height, nodes, atlas.width + 1);
+        if (!stbrp_pack_rects(&ctx, atlas.rects, num_sprites)) {
+            fprintf(stderr, "Error: sprites do not fit into %u x %u atlas.\n", atlas.width, atlas.height);
+            free(nodes);
+            return -2;
+        }
+    }
+    free(nodes);
+
+    uint32_t meta_len = 0, max_x = 0, max_y = 0;
+    for (uint32_t i = 0; i < num_sprites; i++) {
+        uint32_t right = atlas.rects[i].x + atlas.rects[i].w;
+        uint32_t bottom = atlas.rects[i].y + atlas.rects[i].h;
+        if (right > max_x) max_x = right;
+        if (bottom > max_y) max_y = bottom;
+        meta_len += META_LINE_LENGTH + PALETTE_SIZE;
+    }
+
+    atlas.width = max_x;
+    atlas.height = max_y;
+    fprintf(stderr, "Atlas size: %u x %u\n", atlas.width, atlas.height);
+
+    if (atlas.width == 0 || atlas.height == 0) {
+        fprintf(stderr, "Error: empty atlas after cropping (%u x %u)\n", atlas.width, atlas.height);
+        return -3;
+    }
+
+    meta = (char*) calloc(meta_len, 1);
+    output = (uint8_t*) calloc(atlas.width * atlas.height, 1);
+    if (!meta || !output) {
+        fprintf(stderr, "Error: not enough memory for atlas buffers\n");
+        free(meta);
+        free(output);
+        return -4;
+    }
+
+    char* meta_ptr = meta;
+    for (uint32_t i = 0; i < num_sprites; i++) {
+        Sprite& spr = sff.sprites[i];
+        bool isRGBA = (spr.rle == -11 || spr.rle == -12);
+        if (isRGBA)
+            continue; // Skip RGBA sprites for now
+
+        unsigned char* raw_image_data = copyRawImageFromSprite(spr);
+        char filename[256];
+        snprintf(filename, sizeof(filename), "%d_%d", spr.Group, spr.Number);
+
+        if (atlas.rects[i].w > 0 && atlas.rects[i].h > 0) {
+            uint8_t* src = raw_image_data + (spr.atlas_y * spr.Size[0] + spr.atlas_x);
+            uint8_t* dst = output + (atlas.width * atlas.rects[i].y + atlas.rects[i].x);
+            for (int j = 0; j < atlas.rects[i].h; j++) {
+                memcpy(dst, src, atlas.rects[i].w);
+                dst += atlas.width;
+                src += spr.Size[0];
+            }
+        }
+        free(raw_image_data);
+
+#ifdef __MINGW64__
+        const char* output_format = "%u\t%u\t%u\t%u\t%llu\t%llu\t%u\t%u\t%s\n";
+#else
+        const char* output_format = "%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%s\n";
+#endif
+        meta_ptr += sprintf(meta_ptr, output_format,
+            atlas.rects[i].x, atlas.rects[i].y, atlas.rects[i].w, atlas.rects[i].h,
+            spr.atlas_x, spr.atlas_y, spr.Size[0], spr.Size[1], filename);
+    }
+
+    // Save the atlas metadata to a text file
+    snprintf(out_filename, sizeof(out_filename), "sprite_atlas_%s.txt", basename);
+    FILE* f = fopen(out_filename, "w");
+    if (f) {
+        fwrite(meta, 1, meta_ptr - meta, f);
+        fclose(f);
+    }
+    free(meta);
+
+    // Prepare for saving the atlas as PNG
+    snprintf(out_filename, sizeof(out_filename), "sprite_atlas_%s.png", basename);
+    LodePNGState state;
+    lodepng_state_init(&state);
+
+    // Set color type to palette
+    state.info_raw.colortype = LCT_PALETTE;
+    state.info_raw.bitdepth = 8;
+    state.info_png.color.colortype = LCT_PALETTE;
+    state.info_png.color.bitdepth = 8;
+
+    // Load the palette RGBA data from palette texture (in GPU)
+    GLuint pal_texture_id = sff.palettes[0].texture_id; // Assuming the first palette is used for the atlas
+    uint8_t palette_rgba[256 * 4]; // 256 colors, 4 bytes per color (RGBA)
+    glBindTexture(GL_TEXTURE_2D, pal_texture_id);
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);  // Ensure byte-aligned rows
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, palette_rgba);
+    for (int i = 0; i < 256; i++) {
+        lodepng_palette_add(&state.info_raw, palette_rgba[i * 4 + 0], palette_rgba[i * 4 + 1], palette_rgba[i * 4 + 2], palette_rgba[i * 4 + 3]);
+    }
+    lodepng_palette_add(&state.info_png.color, 0, 0, 0, 0);	// atleast one color is needed for info_png palette. it will crash if not added
+
+    // Save atlas image output to PNG file
+    unsigned char* png = NULL;
+    size_t pngsize = 0;
+    int err_code = lodepng_encode(&png, &pngsize, output, atlas.width, atlas.height, &state);
+    if (!err_code) {
+        err_code = lodepng_save_file(png, pngsize, out_filename);
+        if (err_code) {
+            fprintf(stderr, "Error saving PNG file: %s\n", lodepng_error_text(err_code));
+        }
+    } else {
+        fprintf(stderr, "Error encoding PNG data: %s\n", lodepng_error_text(err_code));
+    }
+    lodepng_state_cleanup(&state);
+    free(png);
+    free(output);
+    return err_code;
+}
+
+int exportSpriteDatabase(Sff& sff) {
+    char out_filename[256];
+    const char* basename = getFilenameNoExt(sff.filename).c_str();
+    snprintf(out_filename, sizeof(out_filename), "sprite_database_%s.txt", basename);
+    FILE* f = fopen(out_filename, "w");
+    if (!f) {
+        fprintf(stderr, "Error opening file for writing: %s\n", out_filename);
+        return -1;
+    }
+
+    for (size_t i = 0; i < sff.header.NumberOfSprites; ++i) {
+        Sprite& spr = sff.sprites[i];
+        fprintf(f, "%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%s\n",
+            spr.Group, spr.Number, spr.Size[0], spr.Size[1],
+            spr.Offset[0], spr.Offset[1], spr.palidx, -spr.rle,
+            compression_code[-spr.rle].c_str());
+    }
+    fclose(f);
+    return 0;
 }
 
 const char* getFilename(const char* fullpath) {
@@ -394,7 +710,7 @@ int main(int argc, char* argv[]) {
     // bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     int showModal = 0; // 0: no modal, 1: export all, 2: export current
-    const char* modalName[] = { "", "Export All Sprite", "Export Current Sprite" };
+    const char* modalName[] = { "", "Export All Sprite", "Export Current Sprite", "Export as Sprite Atlas", "Export Sprite Database" };
 
     // Main loop
     bool done = false;
@@ -465,6 +781,14 @@ int main(int argc, char* argv[]) {
                 spr_export_success = exportCurrentSpriteAsPNG(sff.sprites[spr_idx], sff.palettes[sff.sprites[spr_idx].palidx].texture_id, sff.filename);
                 showModal = 2;
             }
+            if (ImGui::MenuItem(modalName[3])) {
+                spr_export_success = exportAllSpriteAsAtlas(sff);
+                showModal = 3;
+            }
+            if (ImGui::MenuItem(modalName[4])) {
+                spr_export_success = exportSpriteDatabase(sff);
+                showModal = 4;
+            }
             ImGui::EndPopup();
         }
         ImGui::End();
@@ -476,7 +800,12 @@ int main(int argc, char* argv[]) {
 
         // Modal for Export All Sprites
         if (ImGui::BeginPopupModal(modalName[1], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+#ifdef __MINGW64__
+            ImGui::Text("%lld of %d sprites exported successfully.", spr_export_success, sff.header.NumberOfSprites);
+#else
             ImGui::Text("%ld of %d sprites exported successfully.", spr_export_success, sff.header.NumberOfSprites);
+#endif
+
             if (ImGui::Button("OK")) {
                 ImGui::CloseCurrentPopup();
             }
@@ -486,9 +815,37 @@ int main(int argc, char* argv[]) {
         // Modal for Export Current Sprite
         if (ImGui::BeginPopupModal(modalName[2], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
             if (spr_export_success > 0)
+#ifdef __MINGW64__
+                ImGui::Text("Sprite[%lld] exported successfully.", spr_idx);
+#else
                 ImGui::Text("Sprite[%ld] exported successfully.", spr_idx);
+#endif
             else
                 ImGui::Text("Failed to export current sprite.");
+            if (ImGui::Button("OK")) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        // Modal for Export as Sprite Atlas
+        if (ImGui::BeginPopupModal(modalName[3], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            if (spr_export_success == 0)
+                ImGui::Text("Sprite Atlas exported successfully.");
+            else
+                ImGui::Text("Failed to export sprite atlas.");
+            if (ImGui::Button("OK")) {
+                ImGui::CloseCurrentPopup();
+            }
+            ImGui::EndPopup();
+        }
+
+        // Modal for Export Sprite Database
+        if (ImGui::BeginPopupModal(modalName[4], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            if (spr_export_success == 0)
+                ImGui::Text("Sprite database exported successfully.");
+            else
+                ImGui::Text("Failed to export sprite atlas.");
             if (ImGui::Button("OK")) {
                 ImGui::CloseCurrentPopup();
             }
