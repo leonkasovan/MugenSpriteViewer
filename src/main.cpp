@@ -247,15 +247,12 @@ int exportAllSpriteAsAtlas(Sff& sff) {
         Sprite& spr = sff.sprites[i];
         bool isRGBA = (spr.rle == -11 || spr.rle == -12);
         if (isRGBA) {
-            // atlas.rects[i].was_packed = 0; // Reset packing status for different palette index
             continue; // Skip RGBA sprites for now
         }
 
         if (spr.palidx != default_palette_index) {
-            // atlas.rects[i].was_packed = 0; // Reset packing status for different palette index
             continue; // Skip sprites with different palette index
         }
-        // atlas.rects[i].was_packed = 1;
 
         unsigned char* p_img = copyRawImageFromSprite(spr);
         int64_t sw = spr.Size[0];
@@ -404,6 +401,10 @@ int exportAllSpriteAsAtlas(Sff& sff) {
         if (isRGBA)
             continue; // Skip RGBA sprites for now
 
+        if (spr.palidx != default_palette_index) {
+            continue; // Skip sprites with different palette index
+        }
+
         unsigned char* raw_image_data = copyRawImageFromSprite(spr);
         char filename[256];
         snprintf(filename, sizeof(filename), "%d_%d", spr.Group, spr.Number);
@@ -416,8 +417,8 @@ int exportAllSpriteAsAtlas(Sff& sff) {
                 dst += atlas.width;
                 src += spr.Size[0];
             }
-        }
-        free(raw_image_data);
+            }
+            free(raw_image_data);
 
 #ifdef __MINGW64__
         const char* output_format = "%u\t%u\t%u\t%u\t%llu\t%llu\t%u\t%u\t%s\n";
