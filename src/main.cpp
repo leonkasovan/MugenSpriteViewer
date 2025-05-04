@@ -428,6 +428,7 @@ int exportAllSpriteAsAtlas(Sff& sff) {
             atlas.rects[i].x, atlas.rects[i].y, atlas.rects[i].w, atlas.rects[i].h,
             spr.atlas_x, spr.atlas_y, spr.Size[0], spr.Size[1], filename);
     }
+    free(atlas.rects);
 
     // Save the atlas metadata to a text file
     snprintf(out_filename, sizeof(out_filename), "sprite_atlas_%s.txt", basename.c_str());
@@ -450,9 +451,8 @@ int exportAllSpriteAsAtlas(Sff& sff) {
     state.info_png.color.bitdepth = 8;
 
     // Load the palette RGBA data from palette texture (in GPU)
-    GLuint pal_texture_id = sff.palettes[0].texture_id; // Assuming the first palette is used for the atlas
     uint8_t palette_rgba[256 * 4]; // 256 colors, 4 bytes per color (RGBA)
-    glBindTexture(GL_TEXTURE_2D, pal_texture_id);
+    glBindTexture(GL_TEXTURE_2D, sff.palettes[default_palette_index].texture_id);
     glPixelStorei(GL_PACK_ALIGNMENT, 1);  // Ensure byte-aligned rows
     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, palette_rgba);
     for (int i = 0; i < 256; i++) {
@@ -989,7 +989,8 @@ int main(int argc, char* argv[]) {
 
     glDeleteVertexArrays(1, &g_quadVAO);
     glDeleteBuffers(1, &g_quadVBO);
-    glDeleteProgram(g_shaderProgram);
+    glDeleteProgram(g_RGBAShaderProgram);
+    glDeleteProgram(g_PalettedShaderProgram);
 
     deleteMugenSprite(sff);
 

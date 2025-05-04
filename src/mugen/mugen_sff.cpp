@@ -1001,6 +1001,9 @@ void deleteMugenSprite(Sff& sff) {
 	for (i = 0; i < sff.header.NumberOfSprites; i++) {
 		glDeleteTextures(1, &sff.sprites[i].texture_id);
 	}
+	// Clear vectors
+	sff.sprites.clear();
+	sff.palettes.clear();
 }
 
 int exportRGBASpriteAsPng(Sprite& s, const char* filename) {
@@ -1013,7 +1016,7 @@ int exportRGBASpriteAsPng(Sprite& s, const char* filename) {
 	lodepng_state_init(&state);
 
 	// Print sprite  information
-	printf("Group:%d,%d size=%ux%u Offset=%u,%u coldepth=%d rle=%d\n", s.Group, s.Number, s.Size[0], s.Size[1], s.Offset[0], s.Offset[1], s.coldepth, s.rle);
+	// printf("Group:%d,%d size=%ux%u Offset=%u,%u coldepth=%d rle=%d\n", s.Group, s.Number, s.Size[0], s.Size[1], s.Offset[0], s.Offset[1], s.coldepth, s.rle);
 
 	// Set color type to RGBA
 	state.info_raw.colortype = LCT_RGBA;
