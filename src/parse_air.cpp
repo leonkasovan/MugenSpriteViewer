@@ -168,27 +168,27 @@ std::map<int, Action> parseAirFile(const std::string& filename) {
 	return actions;
 }
 
-int main(int argc, char* argv[]) {
-	if (argc < 2) {
-		std::cerr << "Usage: airparser <file.air>\n";
-		return 1;
-	}
+// int main(int argc, char* argv[]) {
+// 	if (argc < 2) {
+// 		std::cerr << "Usage: airparser <file.air>\n";
+// 		return 1;
+// 	}
 
-	auto actions = parseAirFile(argv[1]);
-	for (const auto& [num, action] : actions) {
-		std::cout << "Action " << num << " (frames: " << action.frames.size() << ")\n";
-		if (action.loopstart >= 0)
-			std::cout << "  Loop starts at frame index: " << action.loopstart << "\n";
-		for (const auto& frame : action.frames) {
-			std::cout << "  Sprite: " << frame.group << "," << frame.number
-				<< " Offset(" << frame.xoffset << "," << frame.yoffset << ")"
-				<< " Time: " << frame.time
-				<< " Flip: " << (frame.hscale == -1 ? "H" : "") << (frame.vscale == -1 ? "V" : "")
-				<< " Alpha: " << frame.srcAlpha << "/" << frame.dstAlpha
-				<< " Scale: " << frame.xscale << "," << frame.yscale
-				<< " Angle: " << frame.angle << "\n";
-		}
-	}
+// 	auto actions = parseAirFile(argv[1]);
+// 	for (const auto& [num, action] : actions) {
+// 		std::cout << "Action " << num << " (frames: " << action.frames.size() << ")\n";
+// 		if (action.loopstart >= 0)
+// 			std::cout << "  Loop starts at frame index: " << action.loopstart << "\n";
+// 		for (const auto& frame : action.frames) {
+// 			std::cout << "  Sprite: " << frame.group << "," << frame.number
+// 				<< " Offset(" << frame.xoffset << "," << frame.yoffset << ")"
+// 				<< " Time: " << frame.time
+// 				<< " Flip: " << (frame.hscale == -1 ? "H" : "") << (frame.vscale == -1 ? "V" : "")
+// 				<< " Alpha: " << frame.srcAlpha << "/" << frame.dstAlpha
+// 				<< " Scale: " << frame.xscale << "," << frame.yscale
+// 				<< " Angle: " << frame.angle << "\n";
+// 		}
+// 	}
 
-	return 0;
-}
+// 	return 0;
+// }

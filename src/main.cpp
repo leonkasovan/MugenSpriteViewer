@@ -25,6 +25,7 @@
 #include <limits.h>
 #endif
 
+#include "parse_air.cpp"
 
 #define Window_w 640
 #define Window_h 480
@@ -84,6 +85,8 @@ uniform sampler2D tex;
 void main() {
     FragColor = texture(tex, TexCoord);
 })";
+
+std::map<int, Action> parseAirFile(const std::string& filename);
 
 inline bool isACT(const std::filesystem::path& path) {
     auto ext = path.extension().string();
@@ -566,7 +569,7 @@ void setupQuad() {
     glBindVertexArray(0);
 }
 
-void renderSprite(Sprite& spr, GLuint paletteTex, float x, float y, float scale = 1.0f) {
+void renderSprite(const Sprite& spr, GLuint paletteTex, float x, float y, float scale = 1.0f) {
     if (spr.rle == -12 || spr.rle == -11)
         SetShader(g_RGBAShaderProgram);
     else
@@ -593,6 +596,51 @@ void renderSprite(Sprite& spr, GLuint paletteTex, float x, float y, float scale 
     glBindVertexArray(0);
 }
 
+static int current_anim_index = 0;
+static Uint32 last_anim_time = 0;
+
+void renderAction(const Sff& sff, std::map<int, Action>& actions, int action_number, float x, float y, float scale = 1.0f) {
+    auto it = actions.find(action_number);
+    if (it == actions.end()) return;
+
+    const Action& action = it->second;
+    if (action.frames.empty()) return;
+
+    // Advance frame
+    Uint32 now = SDL_GetTicks();
+    const AnimFrame& frame = action.frames[current_anim_index];
+
+    int duration = frame.time > 0 ? frame.time : 1;
+    if (now - last_anim_time >= static_cast<Uint32>(duration * 15)) {
+        last_anim_time = now;
+        current_anim_index++;
+
+        if (current_anim_index >= static_cast<int>(action.frames.size())) {
+            current_anim_index = (action.loopstart >= 0) ? action.loopstart : 0;
+        }
+    }
+
+    const AnimFrame& cur_frame = action.frames[current_anim_index];
+
+    // Find matching sprite
+    auto sprite_it = std::find_if(sff.sprites.begin(), sff.sprites.end(), [&](const Sprite& s) {
+        return s.Group == cur_frame.group && s.Number == cur_frame.number;
+    });
+
+    if (sprite_it != sff.sprites.end()) {
+        const Sprite& sprite = *sprite_it;
+
+        float draw_x = x + cur_frame.xoffset - sprite.Offset[0];
+        float draw_y = y + cur_frame.yoffset - sprite.Offset[1];
+
+        GLuint paletteTex = sff.palettes[sprite.palidx].texture_id;
+
+        // Optional: support scaling
+        float final_scale = scale * cur_frame.xscale;
+
+        renderSprite(sprite, paletteTex, draw_x, draw_y, final_scale);
+    }
+}
 
 int main(int argc, char* argv[]) {
     if (argc <= 1) {
@@ -682,10 +730,18 @@ int main(int argc, char* argv[]) {
     bool useOptPalette = false; // Use optional palette instead of internal palette
     size_t spr_export_success = 0;
 
+    // Action Global Variable
+    static int current_action_no = 0;
+    static std::map<int, Action> actions;
+
     // Generating Sprite's Texture and Palette's Texture from SFF file
     if (loadMugenSprite(argv[1], &sff) != 0) {
         fprintf(stderr, "Failed to load Mugen Sprite %s\n", argv[1]);
         return -1;
+    }
+
+    if (argc > 2) {
+        auto actions = parseAirFile(argv[2]);
     }
 
     // Setup Dear ImGui context
@@ -790,6 +846,9 @@ int main(int argc, char* argv[]) {
             }
             ImGui::EndPopup();
         }
+        ImGui::Separator();
+        ImGui::Text("AIR Action Viewer");
+        ImGui::InputInt("Action No", &current_action_no);
         ImGui::End();
 
         if (showModal) {
@@ -974,11 +1033,13 @@ int main(int argc, char* argv[]) {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         // Custom Sprite Rendering
-        if (useOptPalette) {
-            renderSprite(s, opt_palettes[o_palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
-        } else {
-            renderSprite(s, sff.palettes[s.palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
-        }
+        // if (useOptPalette) {
+        //     renderSprite(s, opt_palettes[o_palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
+        // } else {
+        //     renderSprite(s, sff.palettes[s.palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
+        // }
+        renderAction(sff, actions, current_action_no, Window_w / 2.0f, Window_h / 2.0f, spr_zoom);
+
 
         SDL_GL_SwapWindow(window);
     }
