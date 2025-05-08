@@ -646,7 +646,7 @@ void renderAction(const Sff& sff, std::map<int, Action>& actions, int action_num
     }
 
     const Sprite& sprite = sff.sprites[sprite_it->second];
-    printf("Rendering sprite[%d] %d, %d\n", sprite_it->second, cur_frame.group, cur_frame.number);
+    // printf("Rendering sprite[%d] %d, %d\n", sprite_it->second, cur_frame.group, cur_frame.number);
 
     if (sprite.palidx < 0 || sprite.palidx >= static_cast<int>(sff.palettes.size())) return;
     GLuint paletteTex = sff.palettes[sprite.palidx].texture_id;
@@ -766,6 +766,7 @@ int main(int argc, char* argv[]) {
             return -1;
         }
     }
+    // auto actions_it = actions.begin();
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -870,8 +871,34 @@ int main(int argc, char* argv[]) {
             ImGui::EndPopup();
         }
         ImGui::Separator();
-        ImGui::Text("AIR Action Viewer");
-        ImGui::InputInt("Action No", &current_action_no);
+        // ImGui::Text("AIR Action Viewer");
+        // ImGui::InputInt("Action No", &current_action_no);
+        const char* preview_value = "Select action";
+        std::string action_string = "0";
+
+        auto it = actions.find(current_action_no);
+        if (it != actions.end()) {
+            action_string = std::to_string(it->second.number);
+            preview_value = action_string.c_str();
+        }
+
+        if (ImGui::BeginCombo("Action", preview_value)) {
+            for (const auto& [id, action] : actions) {
+                bool is_selected = (current_action_no == id);
+                if (ImGui::Selectable(std::to_string(action.number).c_str(), is_selected))
+                    current_action_no = id;
+
+                if (is_selected)
+                    ImGui::SetItemDefaultFocus();
+            }
+            ImGui::EndCombo();
+        }
+
+        if (current_action_no != -1) {
+            const Action& selectedAction = actions.at(current_action_no);
+            ImGui::Text("Selected: %d (ID: %d)", selectedAction.number, current_action_no);
+        }
+
         ImGui::End();
 
         if (showModal) {
