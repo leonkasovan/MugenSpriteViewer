@@ -596,15 +596,30 @@ void renderSprite(const Sprite& spr, GLuint paletteTex, float x, float y, float 
     glBindVertexArray(0);
 }
 
+const Sprite* getSprite(const Sff& sff, int group, int number) {
+    auto key = std::array<int, 2>{group, number};
+    auto it = sff.sprite_map.find(key);
+    if (it != sff.sprite_map.end()) {
+        return &sff.sprites[it->second];
+    }
+    return nullptr; // Not found
+}
+
 static int current_anim_index = 0;
 static Uint32 last_anim_time = 0;
 
 void renderAction(const Sff& sff, std::map<int, Action>& actions, int action_number, float x, float y, float scale = 1.0f) {
     auto it = actions.find(action_number);
-    if (it == actions.end()) return;
+    if (it == actions.end()) {
+        printf("Action %d not found\n", action_number);
+        return;
+    }
 
     const Action& action = it->second;
-    if (action.frames.empty()) return;
+    if (action.frames.empty()) {
+        printf("Action %d has no frames\n", action_number);
+        return;
+    }
 
     // Advance frame
     Uint32 now = SDL_GetTicks();
@@ -622,25 +637,28 @@ void renderAction(const Sff& sff, std::map<int, Action>& actions, int action_num
 
     const AnimFrame& cur_frame = action.frames[current_anim_index];
 
-    // Find matching sprite
-    auto sprite_it = std::find_if(sff.sprites.begin(), sff.sprites.end(), [&](const Sprite& s) {
-        return s.Group == cur_frame.group && s.Number == cur_frame.number;
-    });
-
-    if (sprite_it != sff.sprites.end()) {
-        const Sprite& sprite = *sprite_it;
-
-        float draw_x = x + cur_frame.xoffset - sprite.Offset[0];
-        float draw_y = y + cur_frame.yoffset - sprite.Offset[1];
-
-        GLuint paletteTex = sff.palettes[sprite.palidx].texture_id;
-
-        // Optional: support scaling
-        float final_scale = scale * cur_frame.xscale;
-
-        renderSprite(sprite, paletteTex, draw_x, draw_y, final_scale);
+    // Fast sprite lookup using sprite_map
+    auto key = std::array<int, 2>{cur_frame.group, cur_frame.number};
+    auto sprite_it = sff.sprite_map.find(key);
+    if (sprite_it == sff.sprite_map.end()) {
+        printf("Sprite not found: %d, %d\n", cur_frame.group, cur_frame.number);
+        return;
     }
+
+    const Sprite& sprite = sff.sprites[sprite_it->second];
+    printf("Rendering sprite[%d] %d, %d\n", sprite_it->second, cur_frame.group, cur_frame.number);
+
+    if (sprite.palidx < 0 || sprite.palidx >= static_cast<int>(sff.palettes.size())) return;
+    GLuint paletteTex = sff.palettes[sprite.palidx].texture_id;
+
+    // Final position and scale
+    float draw_x = x + cur_frame.xoffset - sprite.Offset[0];
+    float draw_y = y + cur_frame.yoffset - sprite.Offset[1];
+    float final_scale = scale * cur_frame.xscale;
+
+    renderSprite(sprite, paletteTex, draw_x, draw_y, final_scale);
 }
+
 
 int main(int argc, char* argv[]) {
     if (argc <= 1) {
@@ -741,7 +759,12 @@ int main(int argc, char* argv[]) {
     }
 
     if (argc > 2) {
-        auto actions = parseAirFile(argv[2]);
+        actions = parseAirFile(argv[2]);
+
+        if (actions.empty()) {
+            fprintf(stderr, "Failed to load AIR file %s\n", argv[2]);
+            return -1;
+        }
     }
 
     // Setup Dear ImGui context
@@ -1038,7 +1061,7 @@ int main(int argc, char* argv[]) {
         // } else {
         //     renderSprite(s, sff.palettes[s.palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
         // }
-        renderAction(sff, actions, current_action_no, Window_w / 2.0f, Window_h / 2.0f, spr_zoom);
+        renderAction(sff, actions, current_action_no, draw_pos.x, draw_pos.x, spr_zoom);
 
 
         SDL_GL_SwapWindow(window);

@@ -927,6 +927,8 @@ int loadMugenSprite(const char* filename, Sff* sff) {
 			}
 			break;
 		}
+		// Add sprite_map entry based on (Group, Number)
+		sff->sprite_map[{sff->sprites[i].Group, sff->sprites[i].Number}] = i;
 
 		if (size == 0) {
 			if (indexOfPrevious < i) {

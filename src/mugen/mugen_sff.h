@@ -81,6 +81,7 @@ typedef struct {
 	SffHeader header;
 	std::vector<Sprite> sprites;
 	std::vector<Palette> palettes;
+	std::map<std::array<int, 2>, int> sprite_map; //map for sprite based on group and number
 } Sff;
 
 typedef struct {

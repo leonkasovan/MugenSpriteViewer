@@ -119,7 +119,7 @@ std::map<int, Action> parseAirFile(const std::string& filename) {
 	std::string line;
 	std::map<int, Action> actions;
 	Action* current = nullptr;
-	int clsn2default = 0;
+	size_t clsn2default = 0;
 	std::vector<CollisionBox> clsn2Defaults;
 
 	for (int lineno = 1; std::getline(file, line); ++lineno) {
