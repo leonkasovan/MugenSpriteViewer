@@ -72,8 +72,44 @@ class Palette {
 public:
 	unsigned int texture_id;
 
+	// Constructor
 	Palette(unsigned int id) : texture_id(id) {}
 	Palette(const char* actFilename) : texture_id(generateTextureFromPaletteACT(actFilename)) {}
+
+	// Method
+	bool GetRGBA(char unsigned *pal_rgba) {
+		glBindTexture(GL_TEXTURE_2D, texture_id);
+
+		// Get texture size
+		GLint width = 0, height = 0;
+		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
+		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
+		if (width * height != 256) {
+			// Not a 256-entry palette
+			return false;
+		}
+
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);  // Ensure byte-aligned rows
+		glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, pal_rgba);
+		return true;
+	}
+
+	bool GetRGB(rgb_t* pal_rgb) {
+		glBindTexture(GL_TEXTURE_2D, texture_id);
+
+		// Get texture size
+		GLint width = 0, height = 0;
+		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &width);
+		glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &height);
+		if (width * height != 256) {
+			// Not a 256-entry palette
+			return false;
+		}
+
+		glPixelStorei(GL_PACK_ALIGNMENT, 1);  // Ensure byte-aligned rows
+		glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_BYTE, pal_rgb);
+		return true;
+	}
 };
 
 typedef struct {
@@ -81,6 +117,8 @@ typedef struct {
 	SffHeader header;
 	std::vector<Sprite> sprites;
 	std::vector<Palette> palettes;
+	std::map<int, int> palette_usage;
+	std::map<int, int> compression_format_usage;
 } Sff;
 
 typedef struct {
@@ -149,3 +187,6 @@ int loadMugenSprite(const char* filename, Sff* sff);
 void deleteMugenSprite(Sff& sff);
 int exportPalettedSpriteAsPng(Sprite& s, GLuint pal_texture_id, const char* filename);
 int exportRGBASpriteAsPng(Sprite& s, const char* filename);
+
+bool isRGBASprite(Sprite& s);
+bool isPalettedSprite(Sprite& s);

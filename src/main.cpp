@@ -34,14 +34,14 @@ GLuint g_shaderProgram, g_RGBAShaderProgram, g_PalettedShaderProgram;
 GLuint g_quadVAO, g_quadVBO;
 GLint g_texLocation, g_paletteLocation, g_positionLocation, g_sizeLocation, g_windowSizeLocation;
 
-std::map<int, std::string> compression_code = {
-    {1, "PCX"},
-    {2, "RLE8"},
-    {3, "RLE5"},
-    {4, "LZ5"},
-    {10, "PNG10"},
-    {11, "PNG11"},
-    {12, "PNG12"}
+std::map<int, std::string> compression_format_code = {
+    {-1, "PCX"},
+    {-2, "RLE8"},
+    {-3, "RLE5"},
+    {-4, "LZ5"},
+    {-10, "PNG10"},
+    {-11, "PNG11"},
+    {-12, "PNG12"}
 };
 
 const char* global_vertexShaderSource = R"(
@@ -161,7 +161,7 @@ int exportAllSpriteAsPNG(Sff& sff) {
         snprintf(png_filename, sizeof(png_filename), "%s %d_%d.png", basename.c_str(), spr.Group, spr.Number);
         printf("Exporting %s\n", png_filename);
 
-        if (spr.rle == -11 || spr.rle == -12) { // PNG Image (RGBA)
+        if (isRGBASprite(spr)) { // PNG Image (RGBA)
             exportRGBASpriteAsPng(spr, png_filename) ? ++n_failed : ++n_success;
         } else { // Paletted Image (R only)
             exportPalettedSpriteAsPng(spr, sff.palettes[spr.palidx].texture_id, png_filename) ? ++n_failed : ++n_success;
@@ -171,15 +171,21 @@ int exportAllSpriteAsPNG(Sff& sff) {
     return n_success;
 }
 
-int exportCurrentSpriteAsPNG(Sprite& spr, GLuint pal_texture_id, char* filename) {
+int optimizeSpritePalette(Sff& sff) {
+    return 0;
+}
+
+int exportCurrentSpriteAsPNG(Sff& sff, int64_t spr_idx) {
+    Sprite& spr = sff.sprites[spr_idx];
+    GLuint pal_texture_id = sff.palettes[spr.palidx].texture_id;
     char png_filename[256];
-    std::string basename = getFilenameNoExt(filename);
+    std::string basename = getFilenameNoExt(sff.filename);
     size_t n_success = 0;
     size_t n_failed = 0;
 
     snprintf(png_filename, sizeof(png_filename), "%s_%d_%d.png", basename.c_str(), spr.Group, spr.Number);
 
-    if (spr.rle == -11 || spr.rle == -12) { // PNG Image (RGBA)
+    if (isRGBASprite(spr)) { // PNG Image (RGBA)
         exportRGBASpriteAsPng(spr, png_filename) ? ++n_failed : ++n_success;
     } else { // Paletted Image (R only)
         exportPalettedSpriteAsPng(spr, pal_texture_id, png_filename) ? ++n_failed : ++n_success;
@@ -193,7 +199,7 @@ int exportCurrentSpriteAsPNG(Sprite& spr, GLuint pal_texture_id, char* filename)
 unsigned char* copyRawImageFromSprite(Sprite& spr) {
     int width = spr.Size[0];
     int height = spr.Size[1];
-    bool isRGBA = (spr.rle == -11 || spr.rle == -12);
+    bool isRGBA = isRGBASprite(spr);
 
     unsigned char* data = (unsigned char*) malloc(width * height * (isRGBA ? 4 : 1));
     if (!data) return NULL;
@@ -245,8 +251,8 @@ int exportAllSpriteAsAtlas(Sff& sff) {
 
     for (size_t i = 0; i < num_sprites; i++) {
         Sprite& spr = sff.sprites[i];
-        bool isRGBA = (spr.rle == -11 || spr.rle == -12);
-        if (isRGBA) {
+        
+        if (isRGBASprite(spr)) {
             continue; // Skip RGBA sprites for now
         }
 
@@ -397,8 +403,7 @@ int exportAllSpriteAsAtlas(Sff& sff) {
     char* meta_ptr = meta;
     for (uint32_t i = 0; i < num_sprites; i++) {
         Sprite& spr = sff.sprites[i];
-        bool isRGBA = (spr.rle == -11 || spr.rle == -12);
-        if (isRGBA)
+        if (isRGBASprite(spr))
             continue; // Skip RGBA sprites for now
 
         if (spr.palidx != default_palette_index) {
@@ -494,7 +499,7 @@ int exportSpriteDatabase(Sff& sff) {
         fprintf(f, "%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%s\n",
             spr.Group, spr.Number, spr.Size[0], spr.Size[1],
             spr.Offset[0], spr.Offset[1], spr.palidx, -spr.rle,
-            compression_code[-spr.rle].c_str());
+            compression_format_code[spr.rle].c_str());
     }
     fclose(f);
     return 0;
@@ -567,7 +572,7 @@ void setupQuad() {
 }
 
 void renderSprite(Sprite& spr, GLuint paletteTex, float x, float y, float scale = 1.0f) {
-    if (spr.rle == -12 || spr.rle == -11)
+    if (isRGBASprite(spr))
         SetShader(g_RGBAShaderProgram);
     else
         SetShader(g_PalettedShaderProgram);
@@ -593,6 +598,12 @@ void renderSprite(Sprite& spr, GLuint paletteTex, float x, float y, float scale 
     glBindVertexArray(0);
 }
 
+void showModalOptimizePalette(Sff& sff, std::vector<char> text) {
+    ImGui::InputTextMultiline("##sprite_usage", text.data(), text.size(), ImVec2(300, ImGui::GetTextLineHeight() * 16));
+    if (ImGui::Button("Close")) {
+        ImGui::CloseCurrentPopup();
+    }
+}
 
 int main(int argc, char* argv[]) {
     if (argc <= 1) {
@@ -681,12 +692,27 @@ int main(int argc, char* argv[]) {
     std::vector<Palette> opt_palettes = generateTextureFromPalettes(opt_palette_paths); // Texture palettes from ACT files
     bool useOptPalette = false; // Use optional palette instead of internal palette
     size_t spr_export_success = 0;
+    std::vector<char> textSpriteDataUsage;
 
     // Generating Sprite's Texture and Palette's Texture from SFF file
     if (loadMugenSprite(argv[1], &sff) != 0) {
         fprintf(stderr, "Failed to load Mugen Sprite %s\n", argv[1]);
         return -1;
     }
+
+    // Store palette and compression format usage into string buffer (textSpriteDataUsage) and displayed with 
+    std::ostringstream ss_output;
+    ss_output << "Palette Usage:\n";
+    for (const auto& pair : sff.palette_usage) {
+        ss_output << "\tPal " << pair.first << ":\t" << pair.second << " sprites\n";
+    }
+    ss_output << "\nCompression Usage:\n";
+    for (const auto& pair : sff.compression_format_usage) {
+        ss_output << "\t" << compression_format_code[pair.first] << ":\t" << pair.second << " sprites\n";
+    }
+    std::string stringUsage = ss_output.str();
+    textSpriteDataUsage.assign(stringUsage.begin(), stringUsage.end());
+    textSpriteDataUsage.push_back('\0');
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -709,7 +735,7 @@ int main(int argc, char* argv[]) {
     // bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     int showModal = 0; // 0: no modal, 1: export all, 2: export current
-    const char* modalName[] = { "", "Export All Sprite", "Export Current Sprite", "Export as Sprite Atlas", "Export Sprite Database" };
+    const char* modalName[] = { "", "Export All Sprite", "Export Current Sprite", "Export as Sprite Atlas", "Export Sprite Database", "Sprite Data Usage" };
 
     // Main loop
     bool done = false;
@@ -777,7 +803,7 @@ int main(int argc, char* argv[]) {
                 showModal = 1;
             }
             if (ImGui::MenuItem(modalName[2])) {
-                spr_export_success = exportCurrentSpriteAsPNG(sff.sprites[spr_idx], sff.palettes[sff.sprites[spr_idx].palidx].texture_id, sff.filename);
+                spr_export_success = exportCurrentSpriteAsPNG(sff, spr_idx);
                 showModal = 2;
             }
             if (ImGui::MenuItem(modalName[3])) {
@@ -787,6 +813,10 @@ int main(int argc, char* argv[]) {
             if (ImGui::MenuItem(modalName[4])) {
                 spr_export_success = exportSpriteDatabase(sff);
                 showModal = 4;
+            }
+            if (ImGui::MenuItem(modalName[5])) {
+                spr_export_success = optimizeSpritePalette(sff);
+                showModal = 5;
             }
             ImGui::EndPopup();
         }
@@ -851,6 +881,12 @@ int main(int argc, char* argv[]) {
             ImGui::EndPopup();
         }
 
+        // Modal for optimizing palette
+        if (ImGui::BeginPopupModal(modalName[5], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            showModalOptimizePalette(sff, textSpriteDataUsage);
+            ImGui::EndPopup();
+        }
+            
         if (spr_idx >= sff.header.NumberOfSprites)
             spr_idx = sff.header.NumberOfSprites - 1;
         if (spr_idx < 0)
@@ -866,7 +902,8 @@ int main(int argc, char* argv[]) {
 
         ImGui::Text("Group: %d,%d", s.Group, s.Number);
         ImGui::Text("Size: %dx%d", s.Size[0], s.Size[1]);
-        ImGui::Text("Compression: %s", sff.header.Ver0 == 2 ? compression_code[-s.rle].c_str() : "PCX");
+        // ImGui::Text("Compression: %s", sff.header.Ver0 == 2 ? compression_code[-s.rle].c_str() : "PCX");
+        ImGui::Text("Compression: %s", compression_format_code[s.rle].c_str());
         if (sff.header.Ver0 == 2) {
             ImGui::Text("Color depth: %d", s.coldepth);
         }
