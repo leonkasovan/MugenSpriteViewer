@@ -10,7 +10,18 @@
 1. Auto animation
 2. Browse and zoom with mouse scroll
 3. Load additional palette (*.act)
-4. Auto resize image preview
+4. Export sprites as PNG images
+5. Export sprites as Sprite Sheet
+6. Export sprites data as CSV text
+7. View Sprite Statistic
+8. Register SFF handler (for Windows OS)
+9. Auto resize image preview
+
+### Screenshot:
+![image](https://github.com/user-attachments/assets/4a0ea79c-30b2-4c5f-9835-e1668e7c0954)  
+![image](https://github.com/user-attachments/assets/c18874a6-958b-4b16-b428-137ba73b2591)  
+![image](https://github.com/user-attachments/assets/7ccbec98-980d-47ad-85d5-6255896d45eb)  
+![image](https://github.com/user-attachments/assets/4581825a-cda4-44b3-a28d-57c5c32021ca)  
 
 ### Install
 Download from here:  
