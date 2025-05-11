@@ -781,6 +781,14 @@ uint8_t* readSpriteDataV1(Sprite& s, FILE* file, Sff* sff, uint64_t offset, uint
 	return px;
 }
 
+bool isPalettedSprite(Sprite& s) {
+	return (s.rle == -1 || s.rle == -2 || s.rle == -3 || s.rle == -4 || s.rle == -10);
+}
+
+bool isRGBASprite(Sprite& s) {
+	return (s.rle == -11 || s.rle == -12);
+}
+
 uint8_t* readSpriteDataV2(Sprite& s, FILE* file, uint64_t offset, uint32_t datasize, Sff* sff) {
 	uint8_t* px = NULL;
 	if (s.rle > 0) return NULL;
@@ -910,6 +918,7 @@ int loadMugenSprite(const char* filename, Sff* sff) {
 	sff->sprites.clear();
 	sff->sprites.reserve(sff->header.NumberOfSprites);
 	Sprite* prev = NULL;
+	sff->numLinkedSprites = 0;
 	long shofs = sff->header.FirstSpriteHeaderOffset;
 	for (uint32_t i = 0; i < sff->header.NumberOfSprites; i++) {
 		uint32_t xofs, size;
@@ -927,10 +936,9 @@ int loadMugenSprite(const char* filename, Sff* sff) {
 			}
 			break;
 		}
-		// Add sprite_map entry based on (Group, Number)
-		sff->sprite_map[{sff->sprites[i].Group, sff->sprites[i].Number}] = i;
 
 		if (size == 0) {
+			sff->numLinkedSprites++;
 			if (indexOfPrevious < i) {
 				spriteCopy(sff->sprites[i], sff->sprites[indexOfPrevious]);
 				// printf("Info: Sprite[%d] use prev Sprite[%d]\n", i, indexOfPrevious);
@@ -940,6 +948,8 @@ int loadMugenSprite(const char* filename, Sff* sff) {
 			}
 		} else {
 			uint8_t* data = NULL;
+			int palette_used = -1;
+			int compression_format_used = -1;
 			bool character = true;
 			switch (sff->header.Ver0) {
 			case 1:
@@ -948,6 +958,8 @@ int loadMugenSprite(const char* filename, Sff* sff) {
 					fprintf(stderr, "Error reading sprite v1 data\n");
 					return -1;
 				}
+				palette_used = sff->sprites[i].palidx;
+				sff->palette_usage[palette_used]++;
 				break;
 			case 2:
 				data = readSpriteDataV2(sff->sprites[i], file, xofs, size, sff);
@@ -955,13 +967,19 @@ int loadMugenSprite(const char* filename, Sff* sff) {
 					fprintf(stderr, "Error reading sprite v2 data\n");
 					return -1;
 				}
+				if (isPalettedSprite(sff->sprites[i])) {
+					palette_used = sff->sprites[i].palidx;
+					sff->palette_usage[palette_used]++;
+				}
 				break;
 			default:
 				fprintf(stderr, "Warning: unsupported sprite version: %d.x.x.x\n", sff->header.Ver0);
 				break;
 			}
+			compression_format_used = sff->sprites[i].rle;
+			sff->compression_format_usage[compression_format_used]++;
 			if (data) {
-				if (sff->sprites[i].rle == -11 || sff->sprites[i].rle == -12)	// PNG Image (RGBA)
+				if (isRGBASprite(sff->sprites[i]))	// PNG Image (RGBA)
 					sff->sprites[i].texture_id = generateTextureRGBAFromSprite(sff->sprites[i].Size[0], sff->sprites[i].Size[1], data);
 				else	// Paletted Image (R only)
 					sff->sprites[i].texture_id = generateTextureFromSprite(sff->sprites[i].Size[0], sff->sprites[i].Size[1], data);
@@ -1009,7 +1027,7 @@ void deleteMugenSprite(Sff& sff) {
 }
 
 int exportRGBASpriteAsPng(Sprite& s, const char* filename) {
-	if (s.rle != -11 && s.rle != -12) {	// PNG Image (RGBA)
+	if (!isRGBASprite(s)) {	// PNG Image (RGBA)
 		fprintf(stderr, "Error: sprite is not a RGBA image\n");
 		return -1;
 	}
@@ -1050,7 +1068,7 @@ int exportRGBASpriteAsPng(Sprite& s, const char* filename) {
 }
 
 int exportPalettedSpriteAsPng(Sprite& s, GLuint pal_texture_id, const char* filename) {
-	if (s.rle != -1 && s.rle != -2 && s.rle != -3 && s.rle != -4 && s.rle != -10) {	// Paletted Image (R only)
+	if (!isPalettedSprite(s)) {	// Paletted Image (R only)
 		fprintf(stderr, "Error: sprite is not a paletted image. Compression method: %d\n", s.rle);
 		return -1;
 	}

@@ -5,8 +5,15 @@
 # Compiler
 #CXX = g++
 #CXX = clang++
+RC = windres
 
 EXE = MugenSpriteViewer.exe
+
+# Resource
+RES_DIR = res
+RCFILE = $(RES_DIR)/mugen.rc
+RESFILE = $(RES_DIR)/mugen_res.o
+ICON = $(RES_DIR)/mugen.ico
 
 # Source directories
 SRC_DIR = src
@@ -79,8 +86,16 @@ all: $(EXE)
 debug: $(EXE)
 	@echo Debug build complete for $(ECHO_MESSAGE)
 
+ifeq ($(OS), Windows_NT)
+$(RESFILE): $(RCFILE) $(ICON)
+	$(RC) $(RCFILE) -o $(RESFILE)
+	
+$(EXE): $(OBJS) $(RESFILE)
+	$(CXX) -o $@ $^ $(CXXFLAGS) $(LIBS)
+else
 $(EXE): $(OBJS)
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(LIBS)
+endif
 
 # Generic compile rule for .cpp and .c
 %.o: %.cpp

@@ -48,14 +48,4 @@ git clone https://github.com/leonkasovan/MugenSpriteViewer.git
 make
 ```
 
-### Todo:
-1. Extra tools support via dynamic library loading.
-2. New tool_sff_info  : generate SFF file information.
-3. New tool_export_pngs : export SFF as PNG images.
-4. New tool_export_atlas : export SFF as sprite atlas (sprite sheet).
-6. New tool_load_animation : load animation definition (AIR format).
-6. New tool_optimize_sff : optimitize SFF.
-
 https://github.com/user-attachments/assets/f2283a08-4585-4c3e-a514-def683f36dcf
-
-

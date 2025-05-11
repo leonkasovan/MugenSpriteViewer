@@ -20,12 +20,12 @@
 #endif
 #ifdef _WIN32
 #include <windows.h>
+#include <shlobj.h>
 #else
 #include <unistd.h>
 #include <limits.h>
 #endif
 
-#include "parse_air.cpp"
 
 #define Window_w 640
 #define Window_h 480
@@ -35,14 +35,14 @@ GLuint g_shaderProgram, g_RGBAShaderProgram, g_PalettedShaderProgram;
 GLuint g_quadVAO, g_quadVBO;
 GLint g_texLocation, g_paletteLocation, g_positionLocation, g_sizeLocation, g_windowSizeLocation;
 
-std::map<int, std::string> compression_code = {
-    {1, "PCX"},
-    {2, "RLE8"},
-    {3, "RLE5"},
-    {4, "LZ5"},
-    {10, "PNG10"},
-    {11, "PNG11"},
-    {12, "PNG12"}
+std::map<int, std::string> compression_format_code = {
+    {-1, "PCX"},
+    {-2, "RLE8"},
+    {-3, "RLE5"},
+    {-4, "LZ5"},
+    {-10, "PNG10"},
+    {-11, "PNG11"},
+    {-12, "PNG12"}
 };
 
 const char* global_vertexShaderSource = R"(
@@ -86,38 +86,6 @@ void main() {
     FragColor = texture(tex, TexCoord);
 })";
 
-std::map<int, Action> parseAirFile(const std::string& filename);
-
-inline bool isACT(const std::filesystem::path& path) {
-    auto ext = path.extension().string();
-    if (ext.length() != 4 || ext[0] != '.') return false;
-    return (ext[1] == 'a' || ext[1] == 'A') &&
-        (ext[2] == 'c' || ext[2] == 'C') &&
-        (ext[3] == 't' || ext[3] == 'T');
-}
-
-// Find and Populate files
-std::vector<std::string> findACTFiles(const std::filesystem::path& root = std::filesystem::current_path()) {
-    std::vector<std::string> files;
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
-        if (entry.is_regular_file() && isACT(entry.path())) {
-            files.push_back(entry.path().string());
-        }
-    }
-    return files;
-}
-
-std::vector<Palette> generateTextureFromPalettes(std::vector<std::string> pals) {
-    std::vector<Palette> result;
-    result.reserve(pals.size());  // Optional: reserve for efficiency
-
-    for (const auto& path : pals) {
-        result.emplace_back(path.c_str());  // Calls Palette(const char* actFilename)
-    }
-
-    return result;
-}
-
 std::string getExecutableDirectory() {
 #ifdef _WIN32
     char path[MAX_PATH];
@@ -152,6 +120,150 @@ std::string getFilenameNoExt(const char* fullpath) {
     return path.substr(start, dotPos - start);
 }
 
+#ifdef _WIN32
+std::string GetExecutablePath() {
+    char buffer[MAX_PATH];
+    DWORD length = GetModuleFileName(nullptr, buffer, MAX_PATH);
+    if (length == 0 || length == MAX_PATH) {
+        // std::wcerr << "Failed to get executable path.\n";
+        fprintf(stderr, "Failed to get executable path.\n");
+        return "";
+    }
+    return std::string(buffer);
+}
+
+// Helper to write a registry value
+bool WriteRegKey(HKEY root, const std::string& subkey, const std::string& valueName, const std::string& valueData) {
+    HKEY hKey;
+    LONG result = RegCreateKeyEx(root, subkey.c_str(), 0, nullptr, 0, KEY_WRITE, nullptr, &hKey, nullptr);
+    if (result != ERROR_SUCCESS) {
+        // std::cerr << "Failed to create/open key: " << subkey << " (Error " << result << ")\n";
+        fprintf(stderr, "Failed to create/open key: %s (Error %ld)\n", subkey.c_str(), result);
+        return false;
+    }
+
+    result = RegSetValueEx(hKey, valueName.c_str(), 0, REG_SZ,
+        (const BYTE*) valueData.c_str(),
+        static_cast<DWORD>((valueData.size() + 1) * sizeof(wchar_t)));
+
+    RegCloseKey(hKey);
+    return result == ERROR_SUCCESS;
+}
+
+// Helper to delete a registry key and all subkeys
+bool DeleteRegKey(HKEY root, const std::string& subkey) {
+    LONG result = RegDeleteTree(root, subkey.c_str());
+    if (result == ERROR_SUCCESS) {
+        // std::cout << "Deleted key: " << subkey << "\n";
+        printf("Deleted key: %s\n", subkey.c_str());
+        return true;
+    } else if (result == ERROR_FILE_NOT_FOUND) {
+        // std::cout << "Key not found: " << subkey << "\n";
+        printf("Key not found: %s\n", subkey.c_str());
+        return true; // Not an error
+    } else {
+        // std::cerr << "Failed to delete key: " << subkey << " (Error " << result << ")\n";
+        fprintf(stderr, "Failed to delete key: %s (Error %ld)\n", subkey.c_str(), result);
+        return false;
+    }
+}
+
+// Helper to delete a value (e.g., file type association)
+bool DeleteRegValue(HKEY root, const std::string& subkey, const std::string& valueName) {
+    HKEY hKey;
+    if (RegOpenKeyEx(root, subkey.c_str(), 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
+        LONG result = RegDeleteValue(hKey, valueName.c_str());
+        RegCloseKey(hKey);
+        if (result == ERROR_SUCCESS) {
+            // std::cout << "Deleted value: " << valueName << " in " << subkey << "\n";
+            printf("Deleted value: %s in %s\n", valueName.c_str(), subkey.c_str());
+            return true;
+        }
+    }
+    return false;
+}
+
+int RegisterSFFHandler() {
+    std::string exePath = GetExecutablePath();
+    if (exePath.empty()) return -1;
+
+    std::string extension = ".sff";
+    std::string fileType = "Mugen.SFF";
+    std::string description = "Mugen Sprite File";
+
+    // 1. Associate .sff with file type
+    WriteRegKey(HKEY_CURRENT_USER, "Software\\Classes\\" + extension, "", fileType);
+
+    // 2. Describe the file type
+    WriteRegKey(HKEY_CURRENT_USER, "Software\\Classes\\" + fileType, "", description);
+
+    // 3. Set default icon
+    WriteRegKey(HKEY_CURRENT_USER, "Software\\Classes\\" + fileType + "\\DefaultIcon", "", exePath + ",0");
+
+    // 4. Set open command
+    WriteRegKey(HKEY_CURRENT_USER,
+        "Software\\Classes\\" + fileType + "\\shell\\open\\command",
+        "",
+        "\"" + exePath + "\" \"%1\"");
+
+    // 5. Notify Windows of the change
+    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+
+    // std::cout << ".sff file association registered for " << exePath << "\n";
+    return 0;
+}
+
+int UnRegisterSFFHandler() {
+    std::string extension = ".sff";
+    std::string fileType = "Mugen.SFF";
+
+    // 1. Remove file type association
+    DeleteRegValue(HKEY_CURRENT_USER, "Software\\Classes\\" + extension, "");
+
+    // 2. Delete file type definition and handlers
+    DeleteRegKey(HKEY_CURRENT_USER, "Software\\Classes\\" + fileType);
+
+    // 3. Optionally, delete the extension key itself (only if it's exclusively used)
+    DeleteRegKey(HKEY_CURRENT_USER, "Software\\Classes\\" + extension);
+
+    // 4. Notify Windows of the change
+    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+
+    // std::wcout << L".sff file association unregistered.\n";
+    return 0;
+}
+#endif
+
+inline bool isACT(const std::filesystem::path& path) {
+    auto ext = path.extension().string();
+    if (ext.length() != 4 || ext[0] != '.') return false;
+    return (ext[1] == 'a' || ext[1] == 'A') &&
+        (ext[2] == 'c' || ext[2] == 'C') &&
+        (ext[3] == 't' || ext[3] == 'T');
+}
+
+// Find and Populate files
+std::vector<std::string> findACTFiles(const std::filesystem::path& root = std::filesystem::current_path()) {
+    std::vector<std::string> files;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
+        if (entry.is_regular_file() && isACT(entry.path())) {
+            files.push_back(entry.path().string());
+        }
+    }
+    return files;
+}
+
+std::vector<Palette> generateTextureFromPalettes(std::vector<std::string> pals) {
+    std::vector<Palette> result;
+    result.reserve(pals.size());  // Optional: reserve for efficiency
+
+    for (const auto& path : pals) {
+        result.emplace_back(path.c_str());  // Calls Palette(const char* actFilename)
+    }
+
+    return result;
+}
+
 int exportAllSpriteAsPNG(Sff& sff) {
     char png_filename[256];
     std::string basename = getFilenameNoExt(sff.filename);
@@ -164,7 +276,7 @@ int exportAllSpriteAsPNG(Sff& sff) {
         snprintf(png_filename, sizeof(png_filename), "%s %d_%d.png", basename.c_str(), spr.Group, spr.Number);
         printf("Exporting %s\n", png_filename);
 
-        if (spr.rle == -11 || spr.rle == -12) { // PNG Image (RGBA)
+        if (isRGBASprite(spr)) { // PNG Image (RGBA)
             exportRGBASpriteAsPng(spr, png_filename) ? ++n_failed : ++n_success;
         } else { // Paletted Image (R only)
             exportPalettedSpriteAsPng(spr, sff.palettes[spr.palidx].texture_id, png_filename) ? ++n_failed : ++n_success;
@@ -174,15 +286,21 @@ int exportAllSpriteAsPNG(Sff& sff) {
     return n_success;
 }
 
-int exportCurrentSpriteAsPNG(Sprite& spr, GLuint pal_texture_id, char* filename) {
+// int optimizeSpritePalette(Sff& sff) {
+//     return 0;
+// }
+
+int exportCurrentSpriteAsPNG(Sff& sff, int64_t spr_idx) {
+    Sprite& spr = sff.sprites[spr_idx];
+    GLuint pal_texture_id = sff.palettes[spr.palidx].texture_id;
     char png_filename[256];
-    std::string basename = getFilenameNoExt(filename);
+    std::string basename = getFilenameNoExt(sff.filename);
     size_t n_success = 0;
     size_t n_failed = 0;
 
     snprintf(png_filename, sizeof(png_filename), "%s_%d_%d.png", basename.c_str(), spr.Group, spr.Number);
 
-    if (spr.rle == -11 || spr.rle == -12) { // PNG Image (RGBA)
+    if (isRGBASprite(spr)) { // PNG Image (RGBA)
         exportRGBASpriteAsPng(spr, png_filename) ? ++n_failed : ++n_success;
     } else { // Paletted Image (R only)
         exportPalettedSpriteAsPng(spr, pal_texture_id, png_filename) ? ++n_failed : ++n_success;
@@ -196,7 +314,7 @@ int exportCurrentSpriteAsPNG(Sprite& spr, GLuint pal_texture_id, char* filename)
 unsigned char* copyRawImageFromSprite(Sprite& spr) {
     int width = spr.Size[0];
     int height = spr.Size[1];
-    bool isRGBA = (spr.rle == -11 || spr.rle == -12);
+    bool isRGBA = isRGBASprite(spr);
 
     unsigned char* data = (unsigned char*) malloc(width * height * (isRGBA ? 4 : 1));
     if (!data) return NULL;
@@ -248,8 +366,8 @@ int exportAllSpriteAsAtlas(Sff& sff) {
 
     for (size_t i = 0; i < num_sprites; i++) {
         Sprite& spr = sff.sprites[i];
-        bool isRGBA = (spr.rle == -11 || spr.rle == -12);
-        if (isRGBA) {
+
+        if (isRGBASprite(spr)) {
             continue; // Skip RGBA sprites for now
         }
 
@@ -400,8 +518,7 @@ int exportAllSpriteAsAtlas(Sff& sff) {
     char* meta_ptr = meta;
     for (uint32_t i = 0; i < num_sprites; i++) {
         Sprite& spr = sff.sprites[i];
-        bool isRGBA = (spr.rle == -11 || spr.rle == -12);
-        if (isRGBA)
+        if (isRGBASprite(spr))
             continue; // Skip RGBA sprites for now
 
         if (spr.palidx != default_palette_index) {
@@ -420,8 +537,8 @@ int exportAllSpriteAsAtlas(Sff& sff) {
                 dst += atlas.width;
                 src += spr.Size[0];
             }
-            }
-            free(raw_image_data);
+        }
+        free(raw_image_data);
 
 #ifdef __MINGW64__
         const char* output_format = "%u\t%u\t%u\t%u\t%llu\t%llu\t%u\t%u\t%s\n";
@@ -497,7 +614,7 @@ int exportSpriteDatabase(Sff& sff) {
         fprintf(f, "%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%s\n",
             spr.Group, spr.Number, spr.Size[0], spr.Size[1],
             spr.Offset[0], spr.Offset[1], spr.palidx, -spr.rle,
-            compression_code[-spr.rle].c_str());
+            compression_format_code[spr.rle].c_str());
     }
     fclose(f);
     return 0;
@@ -569,8 +686,8 @@ void setupQuad() {
     glBindVertexArray(0);
 }
 
-void renderSprite(const Sprite& spr, GLuint paletteTex, float x, float y, float scale = 1.0f) {
-    if (spr.rle == -12 || spr.rle == -11)
+void renderSprite(Sprite& spr, GLuint paletteTex, float x, float y, float scale = 1.0f) {
+    if (isRGBASprite(spr))
         SetShader(g_RGBAShaderProgram);
     else
         SetShader(g_PalettedShaderProgram);
@@ -596,73 +713,49 @@ void renderSprite(const Sprite& spr, GLuint paletteTex, float x, float y, float 
     glBindVertexArray(0);
 }
 
-const Sprite* getSprite(const Sff& sff, int group, int number) {
-    auto key = std::array<int, 2>{group, number};
-    auto it = sff.sprite_map.find(key);
-    if (it != sff.sprite_map.end()) {
-        return &sff.sprites[it->second];
+void showSpriteStatistics(Sff& sff, std::vector<char> text) {
+    ImGui::InputTextMultiline("##sprite_statistic", text.data(), text.size(), ImVec2(300, ImGui::GetTextLineHeight() * 16));
+    if (ImGui::Button("Close")) {
+        ImGui::CloseCurrentPopup();
     }
-    return nullptr; // Not found
 }
 
-static int current_anim_index = 0;
-static Uint32 last_anim_time = 0;
+// Display sprite statistics:
+// 1. Palette usage
+// 2. Compression format usage
+std::vector<char> getSpriteStatistics(Sff& sff) {
+    std::vector<char> res;
+    std::ostringstream ss_output;
 
-void renderAction(const Sff& sff, std::map<int, Action>& actions, int action_number, float x, float y, float scale = 1.0f) {
-    auto it = actions.find(action_number);
-    if (it == actions.end()) {
-        printf("Action %d not found\n", action_number);
-        return;
+    ss_output << "Filename: " << getFilename(sff.filename) << "\n";
+    ss_output << "SFF Version: " << (int) sff.header.Ver0 << "." << (int) sff.header.Ver1 << "." << (int) sff.header.Ver2 << "." << (int) sff.header.Ver3 << "\n\n";
+    ss_output << "Total Sprites: " << sff.header.NumberOfSprites << "\n";
+    ss_output << "\tNormal Sprites: " << sff.header.NumberOfSprites - sff.numLinkedSprites << "\n";
+    ss_output << "\tLinked Sprites: " << sff.numLinkedSprites << "\n\n";
+    ss_output << "Total Palettes: " << sff.header.NumberOfPalettes << "\n\n";
+
+    ss_output << "Compression Usage:\n";
+    for (const auto& pair : sff.compression_format_usage) {
+        ss_output << "\t" << compression_format_code[pair.first] << ":\t" << pair.second << " sprites\n";
     }
-
-    const Action& action = it->second;
-    if (action.frames.empty()) {
-        printf("Action %d has no frames\n", action_number);
-        return;
+    ss_output << "\nPalette Usage:\n";
+    for (const auto& pair : sff.palette_usage) {
+        ss_output << "\tPal " << pair.first << ":\t" << pair.second << " sprites\n";
     }
-
-    // Advance frame
-    Uint32 now = SDL_GetTicks();
-    const AnimFrame& frame = action.frames[current_anim_index];
-
-    int duration = frame.time > 0 ? frame.time : 1;
-    if (now - last_anim_time >= static_cast<Uint32>(duration * 15)) {
-        last_anim_time = now;
-        current_anim_index++;
-
-        if (current_anim_index >= static_cast<int>(action.frames.size())) {
-            current_anim_index = (action.loopstart >= 0) ? action.loopstart : 0;
-        }
-    }
-
-    const AnimFrame& cur_frame = action.frames[current_anim_index];
-
-    // Fast sprite lookup using sprite_map
-    auto key = std::array<int, 2>{cur_frame.group, cur_frame.number};
-    auto sprite_it = sff.sprite_map.find(key);
-    if (sprite_it == sff.sprite_map.end()) {
-        printf("Sprite not found: %d, %d\n", cur_frame.group, cur_frame.number);
-        return;
-    }
-
-    const Sprite& sprite = sff.sprites[sprite_it->second];
-    // printf("Rendering sprite[%d] %d, %d\n", sprite_it->second, cur_frame.group, cur_frame.number);
-
-    if (sprite.palidx < 0 || sprite.palidx >= static_cast<int>(sff.palettes.size())) return;
-    GLuint paletteTex = sff.palettes[sprite.palidx].texture_id;
-
-    // Final position and scale
-    float draw_x = x + cur_frame.xoffset - sprite.Offset[0];
-    float draw_y = y + cur_frame.yoffset - sprite.Offset[1];
-    float final_scale = scale * cur_frame.xscale;
-
-    renderSprite(sprite, paletteTex, draw_x, draw_y, final_scale);
+    std::string stringUsage = ss_output.str();
+    res.assign(stringUsage.begin(), stringUsage.end());
+    res.push_back('\0');
+    return res;
 }
-
 
 int main(int argc, char* argv[]) {
     if (argc <= 1) {
+#ifdef _WIN32
+        RegisterSFFHandler();
+        MessageBox(NULL, "Usage:\n\t1. MugenSpriteViewer.exe [filename]\n\t2. Just double click SFF file in Windows Explorer", "Mugen Sprite Viewer", MB_OK);
+#else
         printf("MugenSpriteViewer\nUsage: %s [filename]\n", argv[0]);
+#endif   
         return -1;
     }
 
@@ -746,27 +839,13 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> opt_palette_paths = findACTFiles(); // Find ACT files from the current directory
     std::vector<Palette> opt_palettes = generateTextureFromPalettes(opt_palette_paths); // Texture palettes from ACT files
     bool useOptPalette = false; // Use optional palette instead of internal palette
-    size_t spr_export_success = 0;
-
-    // Action Global Variable
-    static int current_action_no = 0;
-    static std::map<int, Action> actions;
+    size_t modal_return_status = 0;
 
     // Generating Sprite's Texture and Palette's Texture from SFF file
     if (loadMugenSprite(argv[1], &sff) != 0) {
         fprintf(stderr, "Failed to load Mugen Sprite %s\n", argv[1]);
         return -1;
     }
-
-    if (argc > 2) {
-        actions = parseAirFile(argv[2]);
-
-        if (actions.empty()) {
-            fprintf(stderr, "Failed to load AIR file %s\n", argv[2]);
-            return -1;
-        }
-    }
-    // auto actions_it = actions.begin();
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -789,7 +868,7 @@ int main(int argc, char* argv[]) {
     // bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     int showModal = 0; // 0: no modal, 1: export all, 2: export current
-    const char* modalName[] = { "", "Export All Sprite", "Export Current Sprite", "Export as Sprite Atlas", "Export Sprite Database" };
+    const char* modalName[] = { "", "Export All Sprite", "Export Current Sprite", "Export as Sprite Atlas", "Export Sprite Database", "View Sprite Statistics", "Register SFF Handler", "UnRegister SFF Handler" };
 
     // Main loop
     bool done = false;
@@ -853,52 +932,37 @@ int main(int argc, char* argv[]) {
         ImGui::Text("Total Palettes: %u", sff.header.NumberOfPalettes);
         if (ImGui::BeginPopupContextWindow()) {
             if (ImGui::MenuItem(modalName[1])) {
-                spr_export_success = exportAllSpriteAsPNG(sff);
+                modal_return_status = exportAllSpriteAsPNG(sff);
                 showModal = 1;
             }
             if (ImGui::MenuItem(modalName[2])) {
-                spr_export_success = exportCurrentSpriteAsPNG(sff.sprites[spr_idx], sff.palettes[sff.sprites[spr_idx].palidx].texture_id, sff.filename);
+                modal_return_status = exportCurrentSpriteAsPNG(sff, spr_idx);
                 showModal = 2;
             }
             if (ImGui::MenuItem(modalName[3])) {
-                spr_export_success = exportAllSpriteAsAtlas(sff);
+                modal_return_status = exportAllSpriteAsAtlas(sff);
                 showModal = 3;
             }
             if (ImGui::MenuItem(modalName[4])) {
-                spr_export_success = exportSpriteDatabase(sff);
+                modal_return_status = exportSpriteDatabase(sff);
                 showModal = 4;
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem(modalName[5])) {
+                modal_return_status = 0;
+                showModal = 5;
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem(modalName[6])) {
+                modal_return_status = RegisterSFFHandler();
+                showModal = 6;
+            }
+            if (ImGui::MenuItem(modalName[7])) {
+                modal_return_status = UnRegisterSFFHandler();
+                showModal = 7;
             }
             ImGui::EndPopup();
         }
-        ImGui::Separator();
-        // ImGui::Text("AIR Action Viewer");
-        // ImGui::InputInt("Action No", &current_action_no);
-        const char* preview_value = "Select action";
-        std::string action_string = "0";
-
-        auto it = actions.find(current_action_no);
-        if (it != actions.end()) {
-            action_string = std::to_string(it->second.number);
-            preview_value = action_string.c_str();
-        }
-
-        if (ImGui::BeginCombo("Action", preview_value)) {
-            for (const auto& [id, action] : actions) {
-                bool is_selected = (current_action_no == id);
-                if (ImGui::Selectable(std::to_string(action.number).c_str(), is_selected))
-                    current_action_no = id;
-
-                if (is_selected)
-                    ImGui::SetItemDefaultFocus();
-            }
-            ImGui::EndCombo();
-        }
-
-        if (current_action_no != -1) {
-            const Action& selectedAction = actions.at(current_action_no);
-            ImGui::Text("Selected: %d (ID: %d)", selectedAction.number, current_action_no);
-        }
-
         ImGui::End();
 
         if (showModal) {
@@ -909,9 +973,9 @@ int main(int argc, char* argv[]) {
         // Modal for Export All Sprites
         if (ImGui::BeginPopupModal(modalName[1], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 #ifdef __MINGW64__
-            ImGui::Text("%lld of %d sprites exported successfully.", spr_export_success, sff.header.NumberOfSprites);
+            ImGui::Text("%lld of %d sprites exported successfully.", modal_return_status, sff.header.NumberOfSprites);
 #else
-            ImGui::Text("%ld of %d sprites exported successfully.", spr_export_success, sff.header.NumberOfSprites);
+            ImGui::Text("%ld of %d sprites exported successfully.", modal_return_status, sff.header.NumberOfSprites);
 #endif
 
             if (ImGui::Button("OK")) {
@@ -922,7 +986,7 @@ int main(int argc, char* argv[]) {
 
         // Modal for Export Current Sprite
         if (ImGui::BeginPopupModal(modalName[2], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            if (spr_export_success > 0)
+            if (modal_return_status > 0)
 #ifdef __MINGW64__
                 ImGui::Text("Sprite[%lld] exported successfully.", spr_idx);
 #else
@@ -938,7 +1002,7 @@ int main(int argc, char* argv[]) {
 
         // Modal for Export as Sprite Atlas
         if (ImGui::BeginPopupModal(modalName[3], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            if (spr_export_success == 0)
+            if (modal_return_status == 0)
                 ImGui::Text("Sprite Atlas exported successfully.");
             else
                 ImGui::Text("Failed to export sprite atlas.");
@@ -950,13 +1014,19 @@ int main(int argc, char* argv[]) {
 
         // Modal for Export Sprite Database
         if (ImGui::BeginPopupModal(modalName[4], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            if (spr_export_success == 0)
+            if (modal_return_status == 0)
                 ImGui::Text("Sprite database exported successfully.");
             else
                 ImGui::Text("Failed to export sprite atlas.");
             if (ImGui::Button("OK")) {
                 ImGui::CloseCurrentPopup();
             }
+            ImGui::EndPopup();
+        }
+
+        // Modal for showing sprite statistics
+        if (ImGui::BeginPopupModal(modalName[5], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
+            showSpriteStatistics(sff, getSpriteStatistics(sff));
             ImGui::EndPopup();
         }
 
@@ -975,7 +1045,8 @@ int main(int argc, char* argv[]) {
 
         ImGui::Text("Group: %d,%d", s.Group, s.Number);
         ImGui::Text("Size: %dx%d", s.Size[0], s.Size[1]);
-        ImGui::Text("Compression: %s", sff.header.Ver0 == 2 ? compression_code[-s.rle].c_str() : "PCX");
+        // ImGui::Text("Compression: %s", sff.header.Ver0 == 2 ? compression_code[-s.rle].c_str() : "PCX");
+        ImGui::Text("Compression: %s", compression_format_code[s.rle].c_str());
         if (sff.header.Ver0 == 2) {
             ImGui::Text("Color depth: %d", s.coldepth);
         }
@@ -1083,13 +1154,11 @@ int main(int argc, char* argv[]) {
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         // Custom Sprite Rendering
-        // if (useOptPalette) {
-        //     renderSprite(s, opt_palettes[o_palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
-        // } else {
-        //     renderSprite(s, sff.palettes[s.palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
-        // }
-        renderAction(sff, actions, current_action_no, draw_pos.x, draw_pos.x, spr_zoom);
-
+        if (useOptPalette) {
+            renderSprite(s, opt_palettes[o_palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
+        } else {
+            renderSprite(s, sff.palettes[s.palidx].texture_id, draw_pos.x, draw_pos.y, spr_zoom);
+        }
 
         SDL_GL_SwapWindow(window);
     }
