@@ -77,7 +77,7 @@ public:
 	Palette(const char* actFilename) : texture_id(generateTextureFromPaletteACT(actFilename)) {}
 
 	// Method
-	bool GetRGBA(char unsigned *pal_rgba) {
+	bool GetRGBA(char unsigned* pal_rgba) {
 		glBindTexture(GL_TEXTURE_2D, texture_id);
 
 		// Get texture size
@@ -119,6 +119,7 @@ typedef struct {
 	std::vector<Palette> palettes;
 	std::map<int, int> palette_usage;
 	std::map<int, int> compression_format_usage;
+	size_t numLinkedSprites;
 } Sff;
 
 typedef struct {

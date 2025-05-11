@@ -918,6 +918,7 @@ int loadMugenSprite(const char* filename, Sff* sff) {
 	sff->sprites.clear();
 	sff->sprites.reserve(sff->header.NumberOfSprites);
 	Sprite* prev = NULL;
+	sff->numLinkedSprites = 0;
 	long shofs = sff->header.FirstSpriteHeaderOffset;
 	for (uint32_t i = 0; i < sff->header.NumberOfSprites; i++) {
 		uint32_t xofs, size;
@@ -937,6 +938,7 @@ int loadMugenSprite(const char* filename, Sff* sff) {
 		}
 
 		if (size == 0) {
+			sff->numLinkedSprites++;
 			if (indexOfPrevious < i) {
 				spriteCopy(sff->sprites[i], sff->sprites[indexOfPrevious]);
 				// printf("Info: Sprite[%d] use prev Sprite[%d]\n", i, indexOfPrevious);

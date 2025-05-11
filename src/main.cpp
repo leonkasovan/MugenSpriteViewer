@@ -20,6 +20,7 @@
 #endif
 #ifdef _WIN32
 #include <windows.h>
+#include <shlobj.h>
 #else
 #include <unistd.h>
 #include <limits.h>
@@ -85,36 +86,6 @@ void main() {
     FragColor = texture(tex, TexCoord);
 })";
 
-inline bool isACT(const std::filesystem::path& path) {
-    auto ext = path.extension().string();
-    if (ext.length() != 4 || ext[0] != '.') return false;
-    return (ext[1] == 'a' || ext[1] == 'A') &&
-        (ext[2] == 'c' || ext[2] == 'C') &&
-        (ext[3] == 't' || ext[3] == 'T');
-}
-
-// Find and Populate files
-std::vector<std::string> findACTFiles(const std::filesystem::path& root = std::filesystem::current_path()) {
-    std::vector<std::string> files;
-    for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
-        if (entry.is_regular_file() && isACT(entry.path())) {
-            files.push_back(entry.path().string());
-        }
-    }
-    return files;
-}
-
-std::vector<Palette> generateTextureFromPalettes(std::vector<std::string> pals) {
-    std::vector<Palette> result;
-    result.reserve(pals.size());  // Optional: reserve for efficiency
-
-    for (const auto& path : pals) {
-        result.emplace_back(path.c_str());  // Calls Palette(const char* actFilename)
-    }
-
-    return result;
-}
-
 std::string getExecutableDirectory() {
 #ifdef _WIN32
     char path[MAX_PATH];
@@ -149,6 +120,150 @@ std::string getFilenameNoExt(const char* fullpath) {
     return path.substr(start, dotPos - start);
 }
 
+#ifdef _WIN32
+std::string GetExecutablePath() {
+    char buffer[MAX_PATH];
+    DWORD length = GetModuleFileName(nullptr, buffer, MAX_PATH);
+    if (length == 0 || length == MAX_PATH) {
+        // std::wcerr << "Failed to get executable path.\n";
+        fprintf(stderr, "Failed to get executable path.\n");
+        return "";
+    }
+    return std::string(buffer);
+}
+
+// Helper to write a registry value
+bool WriteRegKey(HKEY root, const std::string& subkey, const std::string& valueName, const std::string& valueData) {
+    HKEY hKey;
+    LONG result = RegCreateKeyEx(root, subkey.c_str(), 0, nullptr, 0, KEY_WRITE, nullptr, &hKey, nullptr);
+    if (result != ERROR_SUCCESS) {
+        // std::cerr << "Failed to create/open key: " << subkey << " (Error " << result << ")\n";
+        fprintf(stderr, "Failed to create/open key: %s (Error %ld)\n", subkey.c_str(), result);
+        return false;
+    }
+
+    result = RegSetValueEx(hKey, valueName.c_str(), 0, REG_SZ,
+        (const BYTE*) valueData.c_str(),
+        static_cast<DWORD>((valueData.size() + 1) * sizeof(wchar_t)));
+
+    RegCloseKey(hKey);
+    return result == ERROR_SUCCESS;
+}
+
+// Helper to delete a registry key and all subkeys
+bool DeleteRegKey(HKEY root, const std::string& subkey) {
+    LONG result = RegDeleteTree(root, subkey.c_str());
+    if (result == ERROR_SUCCESS) {
+        // std::cout << "Deleted key: " << subkey << "\n";
+        printf("Deleted key: %s\n", subkey.c_str());
+        return true;
+    } else if (result == ERROR_FILE_NOT_FOUND) {
+        // std::cout << "Key not found: " << subkey << "\n";
+        printf("Key not found: %s\n", subkey.c_str());
+        return true; // Not an error
+    } else {
+        // std::cerr << "Failed to delete key: " << subkey << " (Error " << result << ")\n";
+        fprintf(stderr, "Failed to delete key: %s (Error %ld)\n", subkey.c_str(), result);
+        return false;
+    }
+}
+
+// Helper to delete a value (e.g., file type association)
+bool DeleteRegValue(HKEY root, const std::string& subkey, const std::string& valueName) {
+    HKEY hKey;
+    if (RegOpenKeyEx(root, subkey.c_str(), 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
+        LONG result = RegDeleteValue(hKey, valueName.c_str());
+        RegCloseKey(hKey);
+        if (result == ERROR_SUCCESS) {
+            // std::cout << "Deleted value: " << valueName << " in " << subkey << "\n";
+            printf("Deleted value: %s in %s\n", valueName.c_str(), subkey.c_str());
+            return true;
+        }
+    }
+    return false;
+}
+
+int RegisterSFFHandler() {
+    std::string exePath = GetExecutablePath();
+    if (exePath.empty()) return -1;
+
+    std::string extension = ".sff";
+    std::string fileType = "Mugen.SFF";
+    std::string description = "Mugen Sprite File";
+
+    // 1. Associate .sff with file type
+    WriteRegKey(HKEY_CURRENT_USER, "Software\\Classes\\" + extension, "", fileType);
+
+    // 2. Describe the file type
+    WriteRegKey(HKEY_CURRENT_USER, "Software\\Classes\\" + fileType, "", description);
+
+    // 3. Set default icon
+    WriteRegKey(HKEY_CURRENT_USER, "Software\\Classes\\" + fileType + "\\DefaultIcon", "", exePath + ",0");
+
+    // 4. Set open command
+    WriteRegKey(HKEY_CURRENT_USER,
+        "Software\\Classes\\" + fileType + "\\shell\\open\\command",
+        "",
+        "\"" + exePath + "\" \"%1\"");
+
+    // 5. Notify Windows of the change
+    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+
+    // std::cout << ".sff file association registered for " << exePath << "\n";
+    return 0;
+}
+
+int UnRegisterSFFHandler() {
+    std::string extension = ".sff";
+    std::string fileType = "Mugen.SFF";
+
+    // 1. Remove file type association
+    DeleteRegValue(HKEY_CURRENT_USER, "Software\\Classes\\" + extension, "");
+
+    // 2. Delete file type definition and handlers
+    DeleteRegKey(HKEY_CURRENT_USER, "Software\\Classes\\" + fileType);
+
+    // 3. Optionally, delete the extension key itself (only if it's exclusively used)
+    DeleteRegKey(HKEY_CURRENT_USER, "Software\\Classes\\" + extension);
+
+    // 4. Notify Windows of the change
+    SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, nullptr, nullptr);
+
+    // std::wcout << L".sff file association unregistered.\n";
+    return 0;
+}
+#endif
+
+inline bool isACT(const std::filesystem::path& path) {
+    auto ext = path.extension().string();
+    if (ext.length() != 4 || ext[0] != '.') return false;
+    return (ext[1] == 'a' || ext[1] == 'A') &&
+        (ext[2] == 'c' || ext[2] == 'C') &&
+        (ext[3] == 't' || ext[3] == 'T');
+}
+
+// Find and Populate files
+std::vector<std::string> findACTFiles(const std::filesystem::path& root = std::filesystem::current_path()) {
+    std::vector<std::string> files;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(root)) {
+        if (entry.is_regular_file() && isACT(entry.path())) {
+            files.push_back(entry.path().string());
+        }
+    }
+    return files;
+}
+
+std::vector<Palette> generateTextureFromPalettes(std::vector<std::string> pals) {
+    std::vector<Palette> result;
+    result.reserve(pals.size());  // Optional: reserve for efficiency
+
+    for (const auto& path : pals) {
+        result.emplace_back(path.c_str());  // Calls Palette(const char* actFilename)
+    }
+
+    return result;
+}
+
 int exportAllSpriteAsPNG(Sff& sff) {
     char png_filename[256];
     std::string basename = getFilenameNoExt(sff.filename);
@@ -171,9 +286,9 @@ int exportAllSpriteAsPNG(Sff& sff) {
     return n_success;
 }
 
-int optimizeSpritePalette(Sff& sff) {
-    return 0;
-}
+// int optimizeSpritePalette(Sff& sff) {
+//     return 0;
+// }
 
 int exportCurrentSpriteAsPNG(Sff& sff, int64_t spr_idx) {
     Sprite& spr = sff.sprites[spr_idx];
@@ -251,7 +366,7 @@ int exportAllSpriteAsAtlas(Sff& sff) {
 
     for (size_t i = 0; i < num_sprites; i++) {
         Sprite& spr = sff.sprites[i];
-        
+
         if (isRGBASprite(spr)) {
             continue; // Skip RGBA sprites for now
         }
@@ -422,8 +537,8 @@ int exportAllSpriteAsAtlas(Sff& sff) {
                 dst += atlas.width;
                 src += spr.Size[0];
             }
-            }
-            free(raw_image_data);
+        }
+        free(raw_image_data);
 
 #ifdef __MINGW64__
         const char* output_format = "%u\t%u\t%u\t%u\t%llu\t%llu\t%u\t%u\t%s\n";
@@ -598,16 +713,49 @@ void renderSprite(Sprite& spr, GLuint paletteTex, float x, float y, float scale 
     glBindVertexArray(0);
 }
 
-void showModalOptimizePalette(Sff& sff, std::vector<char> text) {
-    ImGui::InputTextMultiline("##sprite_usage", text.data(), text.size(), ImVec2(300, ImGui::GetTextLineHeight() * 16));
+void showSpriteStatistics(Sff& sff, std::vector<char> text) {
+    ImGui::InputTextMultiline("##sprite_statistic", text.data(), text.size(), ImVec2(300, ImGui::GetTextLineHeight() * 16));
     if (ImGui::Button("Close")) {
         ImGui::CloseCurrentPopup();
     }
 }
 
+// Display sprite statistics:
+// 1. Palette usage
+// 2. Compression format usage
+std::vector<char> getSpriteStatistics(Sff& sff) {
+    std::vector<char> res;
+    std::ostringstream ss_output;
+
+    ss_output << "Filename: " << getFilename(sff.filename) << "\n";
+    ss_output << "SFF Version: " << (int) sff.header.Ver0 << "." << (int) sff.header.Ver1 << "." << (int) sff.header.Ver2 << "." << (int) sff.header.Ver3 << "\n\n";
+    ss_output << "Total Sprites: " << sff.header.NumberOfSprites << "\n";
+    ss_output << "\tNormal Sprites: " << sff.header.NumberOfSprites - sff.numLinkedSprites << "\n";
+    ss_output << "\tLinked Sprites: " << sff.numLinkedSprites << "\n\n";
+    ss_output << "Total Palettes: " << sff.header.NumberOfPalettes << "\n\n";
+
+    ss_output << "Compression Usage:\n";
+    for (const auto& pair : sff.compression_format_usage) {
+        ss_output << "\t" << compression_format_code[pair.first] << ":\t" << pair.second << " sprites\n";
+    }
+    ss_output << "\nPalette Usage:\n";
+    for (const auto& pair : sff.palette_usage) {
+        ss_output << "\tPal " << pair.first << ":\t" << pair.second << " sprites\n";
+    }
+    std::string stringUsage = ss_output.str();
+    res.assign(stringUsage.begin(), stringUsage.end());
+    res.push_back('\0');
+    return res;
+}
+
 int main(int argc, char* argv[]) {
     if (argc <= 1) {
+#ifdef _WIN32
+        RegisterSFFHandler();
+        MessageBox(NULL, "Usage:\n\t1. MugenSpriteViewer.exe [filename]\n\t2. Just double click SFF file in Windows Explorer", "Mugen Sprite Viewer", MB_OK);
+#else
         printf("MugenSpriteViewer\nUsage: %s [filename]\n", argv[0]);
+#endif   
         return -1;
     }
 
@@ -691,28 +839,13 @@ int main(int argc, char* argv[]) {
     std::vector<std::string> opt_palette_paths = findACTFiles(); // Find ACT files from the current directory
     std::vector<Palette> opt_palettes = generateTextureFromPalettes(opt_palette_paths); // Texture palettes from ACT files
     bool useOptPalette = false; // Use optional palette instead of internal palette
-    size_t spr_export_success = 0;
-    std::vector<char> textSpriteDataUsage;
+    size_t modal_return_status = 0;
 
     // Generating Sprite's Texture and Palette's Texture from SFF file
     if (loadMugenSprite(argv[1], &sff) != 0) {
         fprintf(stderr, "Failed to load Mugen Sprite %s\n", argv[1]);
         return -1;
     }
-
-    // Store palette and compression format usage into string buffer (textSpriteDataUsage) and displayed with 
-    std::ostringstream ss_output;
-    ss_output << "Palette Usage:\n";
-    for (const auto& pair : sff.palette_usage) {
-        ss_output << "\tPal " << pair.first << ":\t" << pair.second << " sprites\n";
-    }
-    ss_output << "\nCompression Usage:\n";
-    for (const auto& pair : sff.compression_format_usage) {
-        ss_output << "\t" << compression_format_code[pair.first] << ":\t" << pair.second << " sprites\n";
-    }
-    std::string stringUsage = ss_output.str();
-    textSpriteDataUsage.assign(stringUsage.begin(), stringUsage.end());
-    textSpriteDataUsage.push_back('\0');
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
@@ -735,7 +868,7 @@ int main(int argc, char* argv[]) {
     // bool show_another_window = false;
     ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
     int showModal = 0; // 0: no modal, 1: export all, 2: export current
-    const char* modalName[] = { "", "Export All Sprite", "Export Current Sprite", "Export as Sprite Atlas", "Export Sprite Database", "Sprite Data Usage" };
+    const char* modalName[] = { "", "Export All Sprite", "Export Current Sprite", "Export as Sprite Atlas", "Export Sprite Database", "View Sprite Statistics", "Register SFF Handler", "UnRegister SFF Handler" };
 
     // Main loop
     bool done = false;
@@ -799,24 +932,34 @@ int main(int argc, char* argv[]) {
         ImGui::Text("Total Palettes: %u", sff.header.NumberOfPalettes);
         if (ImGui::BeginPopupContextWindow()) {
             if (ImGui::MenuItem(modalName[1])) {
-                spr_export_success = exportAllSpriteAsPNG(sff);
+                modal_return_status = exportAllSpriteAsPNG(sff);
                 showModal = 1;
             }
             if (ImGui::MenuItem(modalName[2])) {
-                spr_export_success = exportCurrentSpriteAsPNG(sff, spr_idx);
+                modal_return_status = exportCurrentSpriteAsPNG(sff, spr_idx);
                 showModal = 2;
             }
             if (ImGui::MenuItem(modalName[3])) {
-                spr_export_success = exportAllSpriteAsAtlas(sff);
+                modal_return_status = exportAllSpriteAsAtlas(sff);
                 showModal = 3;
             }
             if (ImGui::MenuItem(modalName[4])) {
-                spr_export_success = exportSpriteDatabase(sff);
+                modal_return_status = exportSpriteDatabase(sff);
                 showModal = 4;
             }
+            ImGui::Separator();
             if (ImGui::MenuItem(modalName[5])) {
-                spr_export_success = optimizeSpritePalette(sff);
+                modal_return_status = 0;
                 showModal = 5;
+            }
+            ImGui::Separator();
+            if (ImGui::MenuItem(modalName[6])) {
+                modal_return_status = RegisterSFFHandler();
+                showModal = 6;
+            }
+            if (ImGui::MenuItem(modalName[7])) {
+                modal_return_status = UnRegisterSFFHandler();
+                showModal = 7;
             }
             ImGui::EndPopup();
         }
@@ -830,9 +973,9 @@ int main(int argc, char* argv[]) {
         // Modal for Export All Sprites
         if (ImGui::BeginPopupModal(modalName[1], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
 #ifdef __MINGW64__
-            ImGui::Text("%lld of %d sprites exported successfully.", spr_export_success, sff.header.NumberOfSprites);
+            ImGui::Text("%lld of %d sprites exported successfully.", modal_return_status, sff.header.NumberOfSprites);
 #else
-            ImGui::Text("%ld of %d sprites exported successfully.", spr_export_success, sff.header.NumberOfSprites);
+            ImGui::Text("%ld of %d sprites exported successfully.", modal_return_status, sff.header.NumberOfSprites);
 #endif
 
             if (ImGui::Button("OK")) {
@@ -843,7 +986,7 @@ int main(int argc, char* argv[]) {
 
         // Modal for Export Current Sprite
         if (ImGui::BeginPopupModal(modalName[2], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            if (spr_export_success > 0)
+            if (modal_return_status > 0)
 #ifdef __MINGW64__
                 ImGui::Text("Sprite[%lld] exported successfully.", spr_idx);
 #else
@@ -859,7 +1002,7 @@ int main(int argc, char* argv[]) {
 
         // Modal for Export as Sprite Atlas
         if (ImGui::BeginPopupModal(modalName[3], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            if (spr_export_success == 0)
+            if (modal_return_status == 0)
                 ImGui::Text("Sprite Atlas exported successfully.");
             else
                 ImGui::Text("Failed to export sprite atlas.");
@@ -871,7 +1014,7 @@ int main(int argc, char* argv[]) {
 
         // Modal for Export Sprite Database
         if (ImGui::BeginPopupModal(modalName[4], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            if (spr_export_success == 0)
+            if (modal_return_status == 0)
                 ImGui::Text("Sprite database exported successfully.");
             else
                 ImGui::Text("Failed to export sprite atlas.");
@@ -881,12 +1024,12 @@ int main(int argc, char* argv[]) {
             ImGui::EndPopup();
         }
 
-        // Modal for optimizing palette
+        // Modal for showing sprite statistics
         if (ImGui::BeginPopupModal(modalName[5], NULL, ImGuiWindowFlags_AlwaysAutoResize)) {
-            showModalOptimizePalette(sff, textSpriteDataUsage);
+            showSpriteStatistics(sff, getSpriteStatistics(sff));
             ImGui::EndPopup();
         }
-            
+
         if (spr_idx >= sff.header.NumberOfSprites)
             spr_idx = sff.header.NumberOfSprites - 1;
         if (spr_idx < 0)
