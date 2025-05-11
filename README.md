@@ -25,8 +25,9 @@
 
 ### Install
 Download from here:  
-Windows 7/10/11 : https://github.com/leonkasovan/MugenSpriteViewer/releases/download/v1.0/MugenSpriteViewer-win64-v1.0.zip  
-Linux x86_64 : https://github.com/leonkasovan/MugenSpriteViewer/releases/download/v1.0/MugenSpriteViewer-linux-x86_64-v1.0.zip  
+1. Windows 7/10/11 : https://github.com/leonkasovan/MugenSpriteViewer/releases/download/v1.0/MugenSpriteViewer-win64-v1.0.zip  
+2. Linux x86_64 : https://github.com/leonkasovan/MugenSpriteViewer/releases/download/v1.0/MugenSpriteViewer-linux-x86_64-v1.0.zip  
+
 Extract and run it from command line.  
 Or register it in Windows to handle SFF file.  
 
