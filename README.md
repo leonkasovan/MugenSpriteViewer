@@ -10,12 +10,24 @@
 1. Auto animation
 2. Browse and zoom with mouse scroll
 3. Load additional palette (*.act)
-4. Auto resize image preview
+4. Export sprites as PNG images
+5. Export sprites as Sprite Sheet
+6. Export sprites data as CSV text
+7. View Sprite Statistic
+8. Register SFF handler (for Windows OS)
+9. Auto resize image preview
+
+### Screenshot:
+![image](https://github.com/user-attachments/assets/4a0ea79c-30b2-4c5f-9835-e1668e7c0954)  
+![image](https://github.com/user-attachments/assets/c18874a6-958b-4b16-b428-137ba73b2591)  
+![image](https://github.com/user-attachments/assets/7ccbec98-980d-47ad-85d5-6255896d45eb)  
+![image](https://github.com/user-attachments/assets/4581825a-cda4-44b3-a28d-57c5c32021ca)  
 
 ### Install
 Download from here:  
-Windows 7/10/11 : https://github.com/leonkasovan/MugenSpriteViewer/releases/download/v1.0/MugenSpriteViewer-win64-v1.0.zip  
-Linux x86_64 : https://github.com/leonkasovan/MugenSpriteViewer/releases/download/v1.0/MugenSpriteViewer-linux-x86_64-v1.0.zip  
+1. Windows 7/10/11 : https://github.com/leonkasovan/MugenSpriteViewer/releases/download/v1.0/MugenSpriteViewer-win64-v1.0.zip  
+2. Linux x86_64 : https://github.com/leonkasovan/MugenSpriteViewer/releases/download/v1.0/MugenSpriteViewer-linux-x86_64-v1.0.zip  
+
 Extract and run it from command line.  
 Or register it in Windows to handle SFF file.  
 
@@ -36,14 +48,4 @@ git clone https://github.com/leonkasovan/MugenSpriteViewer.git
 make
 ```
 
-### Todo:
-1. Extra tools support via dynamic library loading.
-2. New tool_sff_info  : generate SFF file information.
-3. New tool_export_pngs : export SFF as PNG images.
-4. New tool_export_atlas : export SFF as sprite atlas (sprite sheet).
-6. New tool_load_animation : load animation definition (AIR format).
-6. New tool_optimize_sff : optimitize SFF.
-
 https://github.com/user-attachments/assets/f2283a08-4585-4c3e-a514-def683f36dcf
-
-
