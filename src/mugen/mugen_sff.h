@@ -51,16 +51,15 @@ public:
 	int rle;
 	uint8_t coldepth;
 	unsigned int texture_id;
-	size_t atlas_x, atlas_y;
 
 	// Constructor!
 	Sprite(uint16_t group, uint16_t number,
 		uint16_t width, uint16_t height,
 		int16_t offset_x, int16_t offset_y,
 		int pal, int rle_type, uint8_t depth,
-		unsigned int tex_id, size_t ax, size_t ay)
+		unsigned int tex_id)
 		: Group(group), Number(number), palidx(pal), rle(rle_type),
-		coldepth(depth), texture_id(tex_id), atlas_x(ax), atlas_y(ay) {
+		coldepth(depth), texture_id(tex_id) {
 		Size[0] = width;
 		Size[1] = height;
 		Offset[0] = offset_x;

@@ -12,7 +12,7 @@ local is_playing = true
 local MAX_SPRITE = 8
 local MAX_SPRITE_PER_ROW = 4
 local MAX_SPRITE_PER_COL = 2
-local TICK_LIMIT = 0.08	-- normal
+local TICK_LIMIT = 0.08 -- normal
 
 function loadAtlasImage(filename)
 	for k, v in ipairs(g_loaded_atlas_img) do
@@ -30,22 +30,22 @@ end
 function loadChar(name, x, y)
 	local player = {}
 	player.name = string.match(name, "sprite_atlas_(.+)")
-	player.atlas_img = loadAtlasImage("sprite_atlas_"..player.name .. ".png")
+	player.atlas_img = loadAtlasImage("sprite_atlas_" .. player.name .. ".png")
 	player.atlas_dat = {}
-	for line in io.lines("sprite_atlas_"..player.name .. ".csv") do
+	for line in io.lines("sprite_atlas_" .. player.name .. ".csv") do
 		if #line > 0 then
-			local src_x, src_y, src_w, src_h, dst_x, dst_y, dst_w, dst_h, spr_x, spr_y, spr_group_id, spr_img_no =
-				line:match("([%d%-]+),([%d%-]+),(%d+),(%d+),([%d%-]+),([%d%-]+),(%d+),(%d+),([%d%-]+),([%d%-]+),(%d+),(%d+)")
+			local spr_x, spr_y, spr_w, spr_h, spr_off_x, spr_off_y, spr_group_id, spr_img_no =
+				line:match(
+					"([%d%-]+),([%d%-]+),(%d+),(%d+),([%d%-]+),([%d%-]+),(%d+),(%d+)")
 
-				if src_x == nil or spr_img_no == nil then
-					print("Skip: ", line)
-				else
-					table.insert(player.atlas_dat, {
-						tonumber(src_x), tonumber(src_y), tonumber(src_w), tonumber(src_h),
-						tonumber(dst_x), tonumber(dst_y), tonumber(dst_w), tonumber(dst_h),
-						tonumber(spr_x), tonumber(spr_y), tonumber(spr_group_id), tonumber(spr_img_no)
-					})
-				end
+			if spr_x == nil or spr_img_no == nil then
+				print("Skip: ", line)
+			else
+				table.insert(player.atlas_dat, {
+					tonumber(spr_x), tonumber(spr_y), tonumber(spr_w), tonumber(spr_h),
+					tonumber(spr_off_x), tonumber(spr_off_y), tonumber(spr_group_id), tonumber(spr_img_no)
+				})
+			end
 		end
 	end
 	player.atlas_img_w, player.atlas_img_h = player.atlas_img:getDimensions()
@@ -60,22 +60,22 @@ function love.load()
 	local sprites = {}
 	local spr_x, delta_x
 	local spr_y, delta_y
-	
+
 	love.window.setVSync(1)
 	love.window.setTitle("Sprite Atlas Loader Demo")
 
 	local files = love.filesystem.getDirectoryItems("")
 	local n_csv = 0
-    for _, file in ipairs(files) do
-        if file:lower():sub(-4) == ".csv" then
-            table.insert(sprites, file:match("^(.*)%.%w+$") or file)
+	for _, file in ipairs(files) do
+		if file:lower():sub(-4) == ".csv" then
+			table.insert(sprites, file:match("^(.*)%.%w+$") or file)
 			n_csv = n_csv + 1
-        end
+		end
 		if n_csv >= MAX_SPRITE then
 			break
 		end
-    end
-	
+	end
+
 	if #sprites <= MAX_SPRITE_PER_ROW then
 		delta_x = gw / (#sprites + 1)
 	else
@@ -84,8 +84,8 @@ function love.load()
 	delta_y = gh / (math.floor((#sprites - 1) / MAX_SPRITE_PER_ROW) + 2)
 
 	for k, spr in ipairs(sprites) do
-		spr_x = ((k - 1)%MAX_SPRITE_PER_ROW + 1) * delta_x
-		spr_y = (math.floor((k - 1)/MAX_SPRITE_PER_ROW) + 1) * delta_y
+		spr_x = ((k - 1) % MAX_SPRITE_PER_ROW + 1) * delta_x
+		spr_y = (math.floor((k - 1) / MAX_SPRITE_PER_ROW) + 1) * delta_y
 		table.insert(g_players, loadChar(spr, spr_x, spr_y))
 	end
 end
@@ -160,9 +160,12 @@ function love.draw()
 	for i, player in ipairs(g_players) do
 		local data = player.atlas_dat[player.frame_no]
 		if data then
-			local quad = love.graphics.newQuad(data[1], data[2], data[3], data[4], player.atlas_img_w, player.atlas_img_h)
-			love.graphics.draw(player.atlas_img, quad, player.x + data[5] - data[9], player.y + data[6] - data[10])
-			love.graphics.printf(string.format("[%d] %s\nTotal Sprite: %d\nSprite id: %d,%d", i, player.name, #player.atlas_dat, data[11], data[12]), player.x - 50, player.y + 5, 200, "left")
+			love.graphics.draw(player.atlas_img,
+				love.graphics.newQuad(data[1], data[2], data[3], data[4], player.atlas_img_w, player.atlas_img_h),
+				player.x - data[5], player.y - data[6])
+			love.graphics.printf(
+				string.format("[%d] %s\nTotal Sprite: %d\nCurrent [%d]: %d,%d", i, player.name, #player.atlas_dat,
+					player.frame_no, data[7], data[8]), player.x - 50, player.y + 5, 200, "left")
 		else
 			love.graphics.printf(string.format("P%d: Invalid frame", i), player.x, player.y + 5, 200, "left")
 		end
@@ -178,7 +181,8 @@ function love.draw()
 	love.graphics.print("Speed: " .. tostring(TICK_LIMIT), 10, gh - 65)
 	love.graphics.print("FPS: " .. tostring(love.timer.getFPS()), 10, gh - 50)
 	love.graphics.print("Draw Calls: " .. stats.drawcalls, 10, gh - 35)
-	love.graphics.print("Texture Memory: " .. tostring(math.floor(stats.texturememory / 1024 / 1024)) .. " MB", 10, gh - 20)
+	love.graphics.print("Texture Memory: " .. tostring(math.floor(stats.texturememory / 1024 / 1024)) .. " MB", 10,
+		gh - 20)
 	-- reset color
 	love.graphics.setColor(1, 1, 1, 1)
 end

@@ -113,5 +113,8 @@ clean:
 
 install: $(EXE)
 	strip -s $(EXE)
-#	install -m 755 $(EXE) /f/PortableApps/MugenSpriteViewer-win64/$(EXE)
+ifeq ($(OS), Windows_NT)
+	install -m 755 $(EXE) /f/PortableApps/MugenSpriteViewer-win64/$(EXE)
+else
 	sudo install -m 755 $(EXE) /usr/bin/$(EXE)
+endif

@@ -381,73 +381,10 @@ int exportAllSpriteAsAtlas(Sff& sff) {
         unsigned char* p_img = copyRawImageFromSprite(spr);
         int64_t sw = spr.Size[0];
         int64_t sh = spr.Size[1];
-        size_t pitch = sw;
-        // fprintf(stderr, "Packing spr[%lld] %u,%u %llux%llu (%d,%d) pal=%d rle=%d\n", i, spr.Group, spr.Number, sw, sh, spr.Offset[0], spr.Offset[1], spr.palidx, spr.rle);
-
-        spr.atlas_x = 0;
-        spr.atlas_y = 0;
 
         if (sw > (int64_t) maxw) maxw = sw;
         if (sh > (int64_t) maxh) maxh = sh;
         prod += sw * sh;
-
-        // Crop top
-        while (sh > 0) {
-            int empty = 1;
-            for (int64_t x = 0; x < sw; x++) {
-                if (p_img[x + spr.atlas_y * pitch]) {
-                    empty = 0;
-                    break;
-                }
-            }
-            if (!empty) break;
-            spr.atlas_y++;
-            sh--;
-        }
-
-        // Crop bottom
-        while (sh > 0) {
-            int empty = 1;
-            for (int64_t x = 0; x < sw; x++) {
-                if (p_img[x + (spr.atlas_y + sh - 1) * pitch]) {
-                    empty = 0;
-                    break;
-                }
-            }
-            if (!empty) break;
-            sh--;
-        }
-
-        // Crop left
-        while (sw > 0) {
-            int empty = 1;
-            for (int64_t y = 0; y < sh; y++) {
-                if (p_img[(spr.atlas_y + y) * pitch + spr.atlas_x]) {
-                    empty = 0;
-                    break;
-                }
-            }
-            if (!empty) break;
-            spr.atlas_x++;
-            sw--;
-        }
-
-        // Crop right
-        while (sw > 0) {
-            int empty = 1;
-            for (int64_t y = 0; y < sh; y++) {
-                if (p_img[(spr.atlas_y + y) * pitch + spr.atlas_x + sw - 1]) {
-                    empty = 0;
-                    break;
-                }
-            }
-            if (!empty) break;
-            sw--;
-        }
-
-        if (sw < 1 || sh < 1) {
-            sw = sh = spr.atlas_x = spr.atlas_y = 0;
-        }
 
         atlas.rects[i].id = i;
         atlas.rects[i].w = sw;
@@ -456,7 +393,7 @@ int exportAllSpriteAsAtlas(Sff& sff) {
         if (p_img) free(p_img);
     }
 
-    fprintf(stderr, "Atlas Max width: %zu, Max height: %zu\n", maxw, maxh);
+    // fprintf(stderr, "Atlas Max width: %zu, Max height: %zu\n", maxw, maxh);
     // Calculate atlas size rounded up to next power of two
     size_t root = 1;
     while (root * root < (size_t) prod) root++;
@@ -502,7 +439,6 @@ int exportAllSpriteAsAtlas(Sff& sff) {
 
     atlas.width = max_x;
     atlas.height = max_y;
-    fprintf(stderr, "Atlas size: %u x %u\n", atlas.width, atlas.height);
 
     if (atlas.width == 0 || atlas.height == 0) {
         fprintf(stderr, "Error: empty atlas after cropping (%u x %u)\n", atlas.width, atlas.height);
@@ -519,7 +455,7 @@ int exportAllSpriteAsAtlas(Sff& sff) {
     }
 
     char* meta_ptr = meta;
-    meta_ptr += sprintf(meta_ptr, "atlas_rect_x,atlas_rect_y,atlas_rect_width,atlas_rect_height,atlas_spr_x,atlas_spr_y,atlas_spr_width,atlas_spr_height,spr_OffsetX,spr_OffsetY,Group,Number\n");
+    meta_ptr += sprintf(meta_ptr, "spr_x,spr_y,spr_width,spr_height,spr_off_x,spr_off_y,spr_group,spr_no\n");
     for (uint32_t i = 0; i < num_sprites; i++) {
         Sprite& spr = sff.sprites[i];
         if (isRGBASprite(spr))
@@ -532,7 +468,7 @@ int exportAllSpriteAsAtlas(Sff& sff) {
         unsigned char* raw_image_data = copyRawImageFromSprite(spr);
 
         if (atlas.rects[i].w > 0 && atlas.rects[i].h > 0) {
-            uint8_t* src = raw_image_data + (spr.atlas_y * spr.Size[0] + spr.atlas_x);
+            uint8_t* src = raw_image_data;
             uint8_t* dst = output + (atlas.width * atlas.rects[i].y + atlas.rects[i].x);
             for (int j = 0; j < atlas.rects[i].h; j++) {
                 memcpy(dst, src, atlas.rects[i].w);
@@ -543,13 +479,13 @@ int exportAllSpriteAsAtlas(Sff& sff) {
         free(raw_image_data);
 
 #ifdef __MINGW64__
-        const char* output_format = "%d,%d,%u,%u,%lld,%lld,%u,%u,%d,%d,%d,%d\n";
+        const char* output_format = "%d,%d,%u,%u,%d,%d,%d,%d\n";
 #else
-        const char* output_format = "%d,%d,%u,%u,%d,%d,%u,%u,%d,%d,%d,%d\n";
+        const char* output_format = "%d,%d,%u,%u,%d,%d,%d,%d\n";
 #endif
         meta_ptr += sprintf(meta_ptr, output_format,
             atlas.rects[i].x, atlas.rects[i].y, atlas.rects[i].w, atlas.rects[i].h,
-            spr.atlas_x, spr.atlas_y, spr.Size[0], spr.Size[1], spr.Offset[0], spr.Offset[1], spr.Group, spr.Number);
+            spr.Offset[0], spr.Offset[1], spr.Group, spr.Number);
     }
     free(atlas.rects);
 
