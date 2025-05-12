@@ -26,9 +26,12 @@
 #include <limits.h>
 #endif
 
-
 #define Window_w 640
 #define Window_h 480
+
+// Embedded resources
+extern const unsigned char _binary_res_main_lua_start[];
+extern const unsigned char _binary_res_main_lua_end[];
 
 // Global variable
 GLuint g_shaderProgram, g_RGBAShaderProgram, g_PalettedShaderProgram;
@@ -516,6 +519,7 @@ int exportAllSpriteAsAtlas(Sff& sff) {
     }
 
     char* meta_ptr = meta;
+    meta_ptr += sprintf(meta_ptr, "atlas_rect_x,atlas_rect_y,atlas_rect_width,atlas_rect_height,atlas_spr_x,atlas_spr_y,atlas_spr_width,atlas_spr_height,spr_OffsetX,spr_OffsetY,Group,Number\n");
     for (uint32_t i = 0; i < num_sprites; i++) {
         Sprite& spr = sff.sprites[i];
         if (isRGBASprite(spr))
@@ -526,8 +530,6 @@ int exportAllSpriteAsAtlas(Sff& sff) {
         }
 
         unsigned char* raw_image_data = copyRawImageFromSprite(spr);
-        char filename[256];
-        snprintf(filename, sizeof(filename), "%d_%d", spr.Group, spr.Number);
 
         if (atlas.rects[i].w > 0 && atlas.rects[i].h > 0) {
             uint8_t* src = raw_image_data + (spr.atlas_y * spr.Size[0] + spr.atlas_x);
@@ -541,24 +543,32 @@ int exportAllSpriteAsAtlas(Sff& sff) {
         free(raw_image_data);
 
 #ifdef __MINGW64__
-        const char* output_format = "%u\t%u\t%u\t%u\t%llu\t%llu\t%u\t%u\t%s\n";
+        const char* output_format = "%d,%d,%u,%u,%lld,%lld,%u,%u,%d,%d,%d,%d\n";
 #else
-        const char* output_format = "%u\t%u\t%u\t%u\t%u\t%u\t%u\t%u\t%s\n";
+        const char* output_format = "%d,%d,%u,%u,%d,%d,%u,%u,%d,%d,%d,%d\n";
 #endif
         meta_ptr += sprintf(meta_ptr, output_format,
             atlas.rects[i].x, atlas.rects[i].y, atlas.rects[i].w, atlas.rects[i].h,
-            spr.atlas_x, spr.atlas_y, spr.Size[0], spr.Size[1], filename);
+            spr.atlas_x, spr.atlas_y, spr.Size[0], spr.Size[1], spr.Offset[0], spr.Offset[1], spr.Group, spr.Number);
     }
     free(atlas.rects);
 
     // Save the atlas metadata to a text file
-    snprintf(out_filename, sizeof(out_filename), "sprite_atlas_%s.txt", basename.c_str());
+    snprintf(out_filename, sizeof(out_filename), "sprite_atlas_%s.csv", basename.c_str());
     FILE* f = fopen(out_filename, "w");
     if (f) {
         fwrite(meta, 1, meta_ptr - meta, f);
         fclose(f);
     }
     free(meta);
+
+    // Save embedded lua script
+    size_t size = _binary_res_main_lua_end - _binary_res_main_lua_start;
+    f = fopen("main.lua", "w");
+    if (f) {
+        fwrite(_binary_res_main_lua_start, 1, size, f);
+        fclose(f);
+    }
 
     // Prepare for saving the atlas as PNG
     snprintf(out_filename, sizeof(out_filename), "sprite_atlas_%s.png", basename.c_str());
@@ -952,6 +962,7 @@ int main(int argc, char* argv[]) {
                 modal_return_status = 0;
                 showModal = 5;
             }
+#ifdef _WIN32            
             ImGui::Separator();
             if (ImGui::MenuItem(modalName[6])) {
                 modal_return_status = RegisterSFFHandler();
@@ -961,6 +972,7 @@ int main(int argc, char* argv[]) {
                 modal_return_status = UnRegisterSFFHandler();
                 showModal = 7;
             }
+#endif            
             ImGui::EndPopup();
         }
         ImGui::End();

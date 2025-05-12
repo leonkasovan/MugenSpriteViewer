@@ -86,14 +86,18 @@ all: $(EXE)
 debug: $(EXE)
 	@echo Debug build complete for $(ECHO_MESSAGE)
 
+# Embed resource: lua script
+$(RES_DIR)/lua_script.o: $(RES_DIR)/main.lua
+	ld -r -b binary -o $@ $<
+
 ifeq ($(OS), Windows_NT)
 $(RESFILE): $(RCFILE) $(ICON)
 	$(RC) $(RCFILE) -o $(RESFILE)
 	
-$(EXE): $(OBJS) $(RESFILE)
+$(EXE): $(OBJS) $(RESFILE) $(RES_DIR)/lua_script.o
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(LIBS)
 else
-$(EXE): $(OBJS)
+$(EXE): $(OBJS) $(RES_DIR)/lua_script.o
 	$(CXX) -o $@ $^ $(CXXFLAGS) $(LIBS)
 endif
 
