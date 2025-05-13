@@ -709,6 +709,11 @@ int readPcxHeader(Sprite& s, FILE* file, uint64_t offset) {
 	s.Size[0] = rect[2] - rect[0] + 1;
 	s.Size[1] = rect[3] - rect[1] + 1;
 	s.rle = -1;	// -1 for PCX
+	// check if bpl is correct
+	if (bpl != s.Size[0]) {
+		fprintf(stderr, "Warning: Invalid PCX, expected sprite_width=%d has same size with bpl=%d. Override the size with bpl\n", s.Size[0], bpl);
+		s.Size[0] = bpl;
+	}
 	return 0;
 }
 
