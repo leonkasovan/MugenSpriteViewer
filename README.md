@@ -16,6 +16,7 @@
 7. View Sprite Statistic
 8. Register SFF handler (for Windows OS)
 9. Auto resize image preview
+10. Atlas loader in Love2D
 
 ### Screenshot:
 ![image](https://github.com/user-attachments/assets/4a0ea79c-30b2-4c5f-9835-e1668e7c0954)  
